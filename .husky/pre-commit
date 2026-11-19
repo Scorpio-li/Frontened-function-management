@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+# GUI Git 客户端（如 SourceTree）不会加载 .zshrc，PATH 中的 node 可能是旧版本。
+# 优先使用 nvm default 版本的 Node，保证 lint-staged（要求 Node >= 20）正常运行。
+NVM_DEFAULT="$(cat "$HOME/.nvm/alias/default" 2>/dev/null)"
+if [ -n "$NVM_DEFAULT" ] && [ -x "$HOME/.nvm/versions/node/v$NVM_DEFAULT/bin/node" ]; then
+  PATH="$HOME/.nvm/versions/node/v$NVM_DEFAULT/bin:$PATH"
+  export PATH
+fi
+
+./node_modules/.bin/lint-staged

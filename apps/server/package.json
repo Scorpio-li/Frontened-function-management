@@ -1,0 +1,28 @@
+{
+  "name": "@repo/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "本地 Node 后端：账号认证与账号管理 API",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false --env-file-if-exists=.env.local src/index.ts",
+    "build": "tsup src/index.ts --format esm --platform node --clean",
+    "start": "node dist/index.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cookie": "catalog:",
+    "@repo/contracts": "workspace:*",
+    "fastify": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

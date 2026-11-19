@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+coverage/
+*.tsbuildinfo
+
+# tooling caches
+.turbo/
+.vite/
+
+# editor local history
+.history/
+
+# env
+.env
+.env.*
+!.env.example
+
+# local runtime data
+apps/server/data/
+
+# logs & os
+*.log
+.DS_Store
