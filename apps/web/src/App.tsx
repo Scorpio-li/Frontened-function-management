@@ -10,6 +10,7 @@ import { FeatureManagerPage } from './pages/FeatureManagerPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { platformModules } from './platforms';
 
 function AppRoutes() {
   const entries = useFeatures();
@@ -24,6 +25,16 @@ function AppRoutes() {
           <Route element={<RequireAdmin />}>
             <Route path="features" element={<FeatureManagerPage />} />
           </Route>
+          {/* 平台模块路由（与功能管理平级，例如 CSS 效果） */}
+          {platformModules.flatMap((module) =>
+            module.routes.map((route) => {
+              const PlatformRouteElement = route.element;
+
+              return (
+                <Route key={route.path} path={route.path} element={<PlatformRouteElement />} />
+              );
+            }),
+          )}
           {entries
             .filter((entry) => entry.enabled)
             .flatMap(({ feature }) =>

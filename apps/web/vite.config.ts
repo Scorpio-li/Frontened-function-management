@@ -27,6 +27,7 @@ export default defineConfig({
       '@repo/core',
       '@repo/ui',
       '@repo/utils',
+      '@repo/css-effect',
       '@repo/feature-activity',
       '@repo/feature-dashboard',
       '@repo/feature-demo',

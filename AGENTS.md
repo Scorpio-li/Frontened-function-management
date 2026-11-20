@@ -48,14 +48,18 @@
 │   ├── contracts/                # 前后端共享的账号、角色、DTO、错误码与校验常量
 │   ├── ui/                       # 共享 UI 组件与设计令牌
 │   ├── utils/                    # 通用工具函数
-│   ├── feature-dashboard/        # 示例功能包：概览
-│   ├── feature-activity/         # 示例功能包：活动流（演示事件总线）
-│   ├── feature-relationship/     # 示例功能包：中文亲戚关系计算器
-│   ├── feature-heatmap/          # 示例功能包：Heat.js 数据热力图
-│   ├── feature-annotation/       # 示例功能包：Fabric.js 图片标注
-│   ├── feature-pdf-export/       # 示例功能包：dompdf.js 网页转 PDF
-│   ├── feature-infographic/      # 示例功能包：AntV 信息图
-│   ├── feature-guide/            # 示例功能包：intro.js 新手引导
+│   ├── css-effect/               # 平台模块：CSS 效果 / 动画 / ECharts 资产库（与功能管理平级）
+│   ├── features/                 # 所有功能包（feature-*）统一收在此目录
+│   │   ├── feature-dashboard/      # 示例功能包：概览
+│   │   ├── feature-activity/       # 示例功能包：活动流（演示事件总线）
+│   │   ├── feature-relationship/   # 示例功能包：中文亲戚关系计算器
+│   │   ├── feature-heatmap/        # 示例功能包：Heat.js 数据热力图
+│   │   ├── feature-annotation/     # 示例功能包：Fabric.js 图片标注
+│   │   ├── feature-pdf-export/     # 示例功能包：dompdf.js 网页转 PDF
+│   │   ├── feature-infographic/    # 示例功能包：AntV 信息图
+│   │   ├── feature-guide/          # 示例功能包：intro.js 新手引导
+│   │   ├── feature-i18n-converter/ # 示例功能包：JSON 与 Excel 国际化数据互转
+│   │   └── feature-mail/           # 示例功能包：Nodemailer 邮件发送（后端 /api/mail/*）
 │   └── eslint-config/            # 共享 ESLint 配置（不参与构建）
 ├── pnpm-workspace.yaml           # 工作区与依赖版本 Catalog
 ├── turbo.json                    # 任务管道与缓存策略
@@ -133,6 +137,7 @@ export const demoFeature = defineFeature({
 - 宿主在 [App.tsx](apps/web/src/App.tsx) 中根据注册表动态生成 `<Route>`，停用的功能不会生成路由。
 - 侧边栏导航同样来自注册表，多路由功能显示功能名作为分组标题，单路由功能直接显示功能名。
 - 启停状态保存在 `localStorage` 的 `ffm:disabled-features` 键中；该键只存停用列表。
+- **平台模块**（如 CSS 效果）与「功能管理」在侧边栏平级，**不进入** `FeatureRegistry`：在 [platforms.ts](apps/web/src/platforms.ts) 注册，模块自身提供绝对路由与 `useNavItems` 动态子菜单，由 `AppShell` 的 `PlatformNavGroup` 渲染。平台模块代码放在 `packages/css-effect` 这类独立目录，不放进 `packages/features`。
 
 ### 5.3 跨模块通信
 
@@ -237,7 +242,7 @@ apps/server → @repo/contracts
 ## 7. 新增功能模块
 
 0. 先阅读 [packages/FEATURE_INTEGRATION.md](packages/FEATURE_INTEGRATION.md)，确认项目类型与接入方式（React 原生、静态资源 + iframe、独立服务等）。
-1. 复制 `packages/feature-dashboard` 的目录结构与 `package.json`，包名改为 `@repo/feature-<id>`。
+1. 复制 `packages/features/feature-dashboard` 的目录结构与 `package.json`，放到 `packages/features/feature-<id>`，包名改为 `@repo/feature-<id>`。
 2. 在 `src/index.ts` 中用 `defineFeature` 导出功能对象；页面组件放在 `src/` 下。
 3. 如需通信，只通过 `@repo/core` 的 `useEventBus` 或 `setup` 中的 `eventBus`。
 4. 在 `apps/web/package.json` 的 `dependencies` 中添加 `"@repo/feature-<id>": "workspace:*"`。
@@ -278,7 +283,7 @@ apps/server → @repo/contracts
 ## 12. AI 协作约定
 
 - 先读本文件与相关代码，再动手；不要凭猜测新增包或修改契约。
-- 新功能默认放在 `packages/feature-*`，尽量不改宿主；需要改宿主时说明原因并保持最小改动。
+- 新功能默认放在 `packages/features/feature-*`，尽量不改宿主；需要改宿主时说明原因并保持最小改动。
 - 契约变更（`Feature`、`AppEventMap`、registry API、`@repo/contracts` 中的账号/角色/DTO）必须同步文档、测试与调用方。
 - 修改账号、认证或权限相关逻辑时，需同时更新 `apps/server` 的 Vitest 测试，并核对 `@repo/contracts` 与前端调用是否一致；不要在前端或后端各自重复定义 DTO。
 - 不擅自升级工具链主版本、不替换包管理器、不修改 ESLint/Prettier 规则来规避报错。

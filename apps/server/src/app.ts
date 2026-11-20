@@ -9,6 +9,7 @@ import { SESSION_COOKIE_NAME, SessionStore } from './session';
 import { AccountStore, DuplicateUsernameError, normalizeUsername } from './store';
 import type { StoredAccount } from './store';
 import { readSmtpConfig, sendMail, verifySmtpConnection } from './mailer';
+import { DuplicateCategoryError, EffectStore, type EffectType } from './effect-store';
 
 /** 内置管理员固定 id。 */
 const ADMIN_ID = 'admin';
@@ -95,6 +96,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   const store = new AccountStore(options.dataDir);
   await store.init();
   const sessions = new SessionStore(sessionTtlMs);
+  const effectStore = new EffectStore(options.dataDir);
+  await effectStore.init();
 
   function resolveCurrentUser(request: FastifyRequest): CurrentUser | null {
     const sessionId = readSessionId(request);
@@ -404,6 +407,259 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       return reply.send({ ok: true, message: 'SMTP 连接成功' });
     }
     return reply.code(200).send({ ok: false, message: result.message });
+  });
+
+  // —— CSS 效果模块 ——
+
+  app.get('/api/css-effects/categories', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    return effectStore.listCategories();
+  });
+
+  app.post('/api/css-effects/categories', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    if (user.role !== 'admin') return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+
+    const body: unknown = request.body;
+    if (!isRecord(body)) return sendError(reply, 400, 'VALIDATION_ERROR', '请求参数格式不正确');
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const description = typeof body.description === 'string' ? body.description : undefined;
+    if (!name) return sendError(reply, 400, 'VALIDATION_ERROR', '分类名称不能为空');
+
+    try {
+      const created = await effectStore.createCategory({ name, description });
+      return reply.code(201).send(created);
+    } catch (error) {
+      if (error instanceof DuplicateCategoryError) {
+        return sendError(reply, 409, 'CONFLICT', error.message);
+      }
+      if (error instanceof Error) {
+        return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
+      }
+      throw error;
+    }
+  });
+
+  app.patch<{ Params: { id: string } }>(
+    '/api/css-effects/categories/:id',
+    async (request, reply) => {
+      const user = resolveCurrentUser(request);
+      if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+      if (user.role !== 'admin') return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+
+      const body: unknown = request.body;
+      if (!isRecord(body)) return sendError(reply, 400, 'VALIDATION_ERROR', '请求参数格式不正确');
+      const { id } = request.params;
+
+      try {
+        const updated = await effectStore.updateCategory(id, {
+          name: typeof body.name === 'string' ? body.name : undefined,
+          description: typeof body.description === 'string' ? body.description : undefined,
+        });
+        if (!updated) return sendError(reply, 404, 'NOT_FOUND', '分类不存在');
+        return reply.send(updated);
+      } catch (error) {
+        if (error instanceof DuplicateCategoryError) {
+          return sendError(reply, 409, 'CONFLICT', error.message);
+        }
+        if (error instanceof Error) {
+          return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
+        }
+        throw error;
+      }
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    '/api/css-effects/categories/:id',
+    async (request, reply) => {
+      const user = resolveCurrentUser(request);
+      if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+      if (user.role !== 'admin') return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+
+      const removed = await effectStore.deleteCategory(request.params.id);
+      if (!removed) return sendError(reply, 404, 'NOT_FOUND', '分类不存在');
+      return reply.code(204).send();
+    },
+  );
+
+  app.get('/api/css-effects/effects', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+
+    const query = request.query as Record<string, string> | undefined;
+    let categoryId: string | null | undefined;
+    if (query && 'categoryId' in query) {
+      const raw = query.categoryId;
+      if (raw === 'null') categoryId = null;
+      else if (raw === '') categoryId = null;
+      else categoryId = raw;
+    }
+    const type = query?.type as EffectType | undefined;
+    const q = query?.q;
+
+    return effectStore.listEffects({ categoryId, type, q });
+  });
+
+  app.get<{ Params: { id: string } }>('/api/css-effects/effects/:id', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+
+    const effect = effectStore.findEffectById(request.params.id);
+    if (!effect) return sendError(reply, 404, 'NOT_FOUND', '效果不存在');
+    return effect;
+  });
+
+  app.post('/api/css-effects/effects', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    if (user.role !== 'admin') return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+
+    const body: unknown = request.body;
+    if (!isRecord(body)) return sendError(reply, 400, 'VALIDATION_ERROR', '请求参数格式不正确');
+
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    // categoryId 只接受 null 或非空字符串；空白字符串归一为未分类
+    let categoryId: string | null = null;
+    if (typeof body.categoryId === 'string') {
+      const trimmed = body.categoryId.trim();
+      categoryId = trimmed === '' ? null : trimmed;
+    } else if (body.categoryId !== null && body.categoryId !== undefined) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', 'categoryId 必须是字符串或 null');
+    }
+    const description = typeof body.description === 'string' ? body.description : undefined;
+    const effectType = body.effectType as EffectType | undefined;
+    const tags = Array.isArray(body.tags) ? (body.tags as unknown[]).map((t) => String(t)) : [];
+    const html = typeof body.html === 'string' ? body.html : undefined;
+    const css = typeof body.css === 'string' ? body.css : undefined;
+    const js = typeof body.js === 'string' ? body.js : undefined;
+    const echartsOption = body.echartsOption;
+
+    if (!name) return sendError(reply, 400, 'VALIDATION_ERROR', '效果名称不能为空');
+    if (effectType !== 'css' && effectType !== 'animation' && effectType !== 'echarts') {
+      return sendError(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'effectType 必须是 css / animation / echarts',
+      );
+    }
+
+    try {
+      const created = await effectStore.createEffect({
+        name,
+        categoryId,
+        description,
+        effectType,
+        tags,
+        html,
+        css,
+        js,
+        echartsOption,
+      });
+      return reply.code(201).send(created);
+    } catch (error) {
+      if (error instanceof Error) return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
+      throw error;
+    }
+  });
+
+  app.patch<{ Params: { id: string } }>('/api/css-effects/effects/:id', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    if (user.role !== 'admin') return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+
+    const body: unknown = request.body;
+    if (!isRecord(body)) return sendError(reply, 400, 'VALIDATION_ERROR', '请求参数格式不正确');
+
+    const changes: Record<string, unknown> = {};
+    if ('name' in body) changes.name = body.name;
+    if ('categoryId' in body) {
+      // 只接受 null 或字符串；空白字符串归一为未分类
+      if (body.categoryId === null) {
+        changes.categoryId = null;
+      } else if (typeof body.categoryId === 'string') {
+        const trimmed = body.categoryId.trim();
+        changes.categoryId = trimmed === '' ? null : trimmed;
+      } else {
+        return sendError(reply, 400, 'VALIDATION_ERROR', 'categoryId 必须是字符串或 null');
+      }
+    }
+    if ('description' in body) changes.description = body.description;
+    if ('effectType' in body) {
+      const t = body.effectType;
+      if (t !== 'css' && t !== 'animation' && t !== 'echarts') {
+        return sendError(
+          reply,
+          400,
+          'VALIDATION_ERROR',
+          'effectType 必须是 css / animation / echarts',
+        );
+      }
+      changes.effectType = t;
+    }
+    if ('tags' in body) changes.tags = Array.isArray(body.tags) ? body.tags : [];
+    if ('html' in body) changes.html = body.html;
+    if ('css' in body) changes.css = body.css;
+    if ('js' in body) changes.js = body.js;
+    if ('echartsOption' in body) changes.echartsOption = body.echartsOption;
+
+    if (Object.keys(changes).length === 0) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', '请至少提供一个字段');
+    }
+
+    try {
+      const updated = await effectStore.updateEffect(request.params.id, changes);
+      if (!updated) return sendError(reply, 404, 'NOT_FOUND', '效果不存在');
+      return reply.send(updated);
+    } catch (error) {
+      if (error instanceof Error) return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
+      throw error;
+    }
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/css-effects/effects/:id', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    if (user.role !== 'admin') return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+
+    const removed = await effectStore.deleteEffect(request.params.id);
+    if (!removed) return sendError(reply, 404, 'NOT_FOUND', '效果不存在');
+    return reply.code(204).send();
+  });
+
+  app.post('/api/css-effects/effects/batch-move', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    if (user.role !== 'admin') return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+
+    const body: unknown = request.body;
+    if (!isRecord(body)) return sendError(reply, 400, 'VALIDATION_ERROR', '请求参数格式不正确');
+    if (!Array.isArray(body.effectIds) || body.effectIds.length === 0) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', '请提供要转移的 effectIds');
+    }
+    const effectIds = (body.effectIds as unknown[])
+      .map((id) => (typeof id === 'string' ? id.trim() : ''))
+      .filter(Boolean);
+
+    // targetCategoryId 只接受 null 或非空字符串；空白字符串归一为未分类
+    let targetCategoryId: string | null = null;
+    if (typeof body.targetCategoryId === 'string') {
+      const trimmed = body.targetCategoryId.trim();
+      targetCategoryId = trimmed === '' ? null : trimmed;
+    } else if (body.targetCategoryId !== null && body.targetCategoryId !== undefined) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', 'targetCategoryId 必须是字符串或 null');
+    }
+
+    try {
+      const moved = await effectStore.batchMoveEffects(effectIds, targetCategoryId);
+      return reply.send({ moved });
+    } catch (error) {
+      if (error instanceof Error) return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
+      throw error;
+    }
   });
 
   app.setNotFoundHandler((request, reply) => {

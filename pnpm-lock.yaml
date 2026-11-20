@@ -180,39 +180,42 @@ importers:
       '@repo/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@repo/css-effect':
+        specifier: workspace:*
+        version: link:../../packages/css-effect
       '@repo/feature-activity':
         specifier: workspace:*
-        version: link:../../packages/feature-activity
+        version: link:../../packages/features/feature-activity
       '@repo/feature-annotation':
         specifier: workspace:*
-        version: link:../../packages/feature-annotation
+        version: link:../../packages/features/feature-annotation
       '@repo/feature-dashboard':
         specifier: workspace:*
-        version: link:../../packages/feature-dashboard
+        version: link:../../packages/features/feature-dashboard
       '@repo/feature-demo':
         specifier: workspace:*
-        version: link:../../packages/feature-demo
+        version: link:../../packages/features/feature-demo
       '@repo/feature-guide':
         specifier: workspace:*
-        version: link:../../packages/feature-guide
+        version: link:../../packages/features/feature-guide
       '@repo/feature-heatmap':
         specifier: workspace:*
-        version: link:../../packages/feature-heatmap
+        version: link:../../packages/features/feature-heatmap
       '@repo/feature-i18n-converter':
         specifier: workspace:*
-        version: link:../../packages/feature-i18n-converter
+        version: link:../../packages/features/feature-i18n-converter
       '@repo/feature-infographic':
         specifier: workspace:*
-        version: link:../../packages/feature-infographic
+        version: link:../../packages/features/feature-infographic
       '@repo/feature-mail':
         specifier: workspace:*
-        version: link:../../packages/feature-mail
+        version: link:../../packages/features/feature-mail
       '@repo/feature-pdf-export':
         specifier: workspace:*
-        version: link:../../packages/feature-pdf-export
+        version: link:../../packages/features/feature-pdf-export
       '@repo/feature-relationship':
         specifier: workspace:*
-        version: link:../../packages/feature-relationship
+        version: link:../../packages/features/feature-relationship
       '@repo/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -281,6 +284,27 @@ importers:
         specifier: 'catalog:'
         version: 3.2.7(@types/node@24.19.2)(jsdom@26.1.0(canvas@3.2.3))(tsx@4.23.15)(yaml@2.9.1)
 
+  packages/css-effect:
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+      eslint:
+        specifier: 'catalog:'
+        version: 9.39.5
+      react:
+        specifier: 'catalog:'
+        version: 19.3.1
+      react-router-dom:
+        specifier: 'catalog:'
+        version: 7.18.6(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      tsup:
+        specifier: 'catalog:'
+        version: 9.0.0(postcss@8.5.33)(tsx@4.23.15)(typescript@5.9.3)(yaml@2.9.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
   packages/eslint-config:
     dependencies:
       '@eslint/js':
@@ -303,17 +327,17 @@ importers:
         specifier: 'catalog:'
         version: 9.39.5
 
-  packages/feature-activity:
+  packages/features/feature-activity:
     dependencies:
       '@repo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@repo/ui':
         specifier: workspace:*
-        version: link:../ui
+        version: link:../../ui
       '@repo/utils':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../../utils
     devDependencies:
       '@types/react':
         specifier: 'catalog:'
@@ -331,14 +355,14 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/feature-annotation:
+  packages/features/feature-annotation:
     dependencies:
       '@repo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@repo/ui':
         specifier: workspace:*
-        version: link:../ui
+        version: link:../../ui
       fabric:
         specifier: 'catalog:'
         version: 7.4.0
@@ -359,17 +383,17 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/feature-dashboard:
+  packages/features/feature-dashboard:
     dependencies:
       '@repo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@repo/ui':
         specifier: workspace:*
-        version: link:../ui
+        version: link:../../ui
       '@repo/utils':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../../utils
     devDependencies:
       '@types/react':
         specifier: 'catalog:'
@@ -387,17 +411,17 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/feature-demo:
+  packages/features/feature-demo:
     dependencies:
       '@repo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@repo/ui':
         specifier: workspace:*
-        version: link:../ui
+        version: link:../../ui
       '@repo/utils':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../../utils
     devDependencies:
       '@types/react':
         specifier: 'catalog:'
@@ -415,14 +439,14 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/feature-guide:
+  packages/features/feature-guide:
     dependencies:
       '@repo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@repo/ui':
         specifier: workspace:*
-        version: link:../ui
+        version: link:../../ui
       intro.js:
         specifier: 'catalog:'
         version: 8.6.0
@@ -443,14 +467,14 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/feature-heatmap:
+  packages/features/feature-heatmap:
     dependencies:
       '@repo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@repo/ui':
         specifier: workspace:*
-        version: link:../ui
+        version: link:../../ui
       jheat.js:
         specifier: 'catalog:'
         version: 5.2.0
@@ -471,17 +495,17 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/feature-i18n-converter:
+  packages/features/feature-i18n-converter:
     dependencies:
       '@repo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@repo/ui':
         specifier: workspace:*
-        version: link:../ui
+        version: link:../../ui
       '@repo/utils':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../../utils
       xlsx:
         specifier: 'catalog:'
         version: 0.18.5
@@ -502,17 +526,17 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/feature-infographic:
+  packages/features/feature-infographic:
     dependencies:
       '@antv/infographic':
         specifier: 'catalog:'
         version: 0.2.20(canvas@3.2.3)
       '@repo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@repo/ui':
         specifier: workspace:*
-        version: link:../ui
+        version: link:../../ui
     devDependencies:
       '@types/react':
         specifier: 'catalog:'
@@ -530,17 +554,17 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/feature-mail:
+  packages/features/feature-mail:
     dependencies:
       '@repo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@repo/ui':
         specifier: workspace:*
-        version: link:../ui
+        version: link:../../ui
       '@repo/utils':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../../utils
     devDependencies:
       '@types/react':
         specifier: 'catalog:'
@@ -558,14 +582,14 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/feature-pdf-export:
+  packages/features/feature-pdf-export:
     dependencies:
       '@repo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@repo/ui':
         specifier: workspace:*
-        version: link:../ui
+        version: link:../../ui
       dompdf.js:
         specifier: 'catalog:'
         version: 2.0.8
@@ -586,14 +610,14 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
-  packages/feature-relationship:
+  packages/features/feature-relationship:
     dependencies:
       '@repo/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../core
       '@repo/ui':
         specifier: workspace:*
-        version: link:../ui
+        version: link:../../ui
       relationship-ts:
         specifier: 'catalog:'
         version: 0.1.1

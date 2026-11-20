@@ -17,7 +17,7 @@
 ## 2. 平台机制
 
 - 宿主：`apps/web`，Vite + React Router，负责登录、导航、路由挂载与功能启停。
-- 功能包：`packages/feature-*`，用 `defineFeature` 声明，导出一个 `Feature` 对象：
+- 功能包：`packages/features/feature-*`，用 `defineFeature` 声明，导出一个 `Feature` 对象：
 
 ```ts
 import { defineFeature } from '@repo/core';
@@ -50,7 +50,7 @@ export const demoFeature = defineFeature({
 
 ## 3. React 项目接入（推荐）
 
-1. 复制 `packages/feature-dashboard` 为 `packages/feature-<id>`，修改 `package.json` 包名为 `@repo/feature-<id>`。
+1. 复制 `packages/features/feature-dashboard` 为 `packages/features/feature-<id>`，修改 `package.json` 包名为 `@repo/feature-<id>`。
 2. 在 `src/index.ts` 中用 `defineFeature` 导出功能对象。
 3. 页面组件、样式、状态都放在该包内；不要导入 `apps/web` 或其他 `feature-*` 包。
 4. 在 `apps/web/package.json` 增加 `"@repo/feature-<id>": "workspace:*"`。

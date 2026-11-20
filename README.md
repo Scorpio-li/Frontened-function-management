@@ -24,6 +24,8 @@ pnpm dev
 
 打开 http://localhost:5173 会跳转到登录页。管理员用户名默认 `admin`，密码由本地 `apps/server/.env.local` 中的 `FFM_ADMIN_PASSWORD` 决定——**请不要把真实密码写入仓库中的任何文件**。
 
+「邮件发送」功能需要额外的 SMTP 配置：在 `apps/server/.env.local` 中设置 `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`（示例见 `apps/server/.env.example`）。未配置时页面会展示引导提示，发送与测试连接按钮不可用。
+
 ## 目录结构
 
 ```text
@@ -35,15 +37,19 @@ packages/
   contracts/               # 前后端共享的角色、账号 DTO、错误码与校验常量
   ui/                      # 共享组件与设计令牌
   utils/                   # 通用工具
-  feature-dashboard/       # 示例功能：概览
-  feature-activity/        # 示例功能：活动流
-  feature-demo/            # 示例功能：示例页
-  feature-relationship/    # 示例功能：中文亲戚关系计算器
-  feature-heatmap/         # 示例功能：Heat.js 数据热力图
-  feature-annotation/      # 示例功能：Fabric.js 图片标注
-  feature-pdf-export/      # 示例功能：dompdf.js 网页转 PDF
-  feature-infographic/     # 示例功能：AntV 信息图
-  feature-guide/           # 示例功能：intro.js 新手引导
+  css-effect/              # 平台模块：CSS 效果 / 动画 / ECharts 资产库（与功能管理平级）
+  features/                # 所有功能包（feature-*）统一收在此目录
+    feature-dashboard/       # 示例功能：概览
+    feature-activity/        # 示例功能：活动流
+    feature-demo/            # 示例功能：示例页
+    feature-relationship/    # 示例功能：中文亲戚关系计算器
+    feature-heatmap/         # 示例功能：Heat.js 数据热力图
+    feature-annotation/      # 示例功能：Fabric.js 图片标注
+    feature-pdf-export/      # 示例功能：dompdf.js 网页转 PDF
+    feature-infographic/     # 示例功能：AntV 信息图
+    feature-guide/           # 示例功能：intro.js 新手引导
+    feature-i18n-converter/  # 示例功能：JSON 与 Excel 国际化数据互转
+    feature-mail/            # 示例功能：Nodemailer 邮件发送（需配置 SMTP）
   eslint-config/           # 共享 ESLint 配置
   FEATURE_INTEGRATION.md   # 功能接入文档（新增功能前必读）
 ```
@@ -79,6 +85,6 @@ packages/
 
 新增功能模块前必须先阅读 [packages/FEATURE_INTEGRATION.md](./packages/FEATURE_INTEGRATION.md)，其中说明了 React 原生接入方式，以及 HTML/CSS/JS、Vue、ECharts、Node 项目如何通过静态资源、iframe 或独立服务接入。
 
-React 功能的标准流程：新建 `packages/feature-*` 包并导出 `defineFeature` 契约、在 `apps/web/src/features.ts` 注册、在 `apps/web/package.json` 添加工作区依赖。
+React 功能的标准流程：新建 `packages/features/feature-*` 包并导出 `defineFeature` 契约、在 `apps/web/src/features.ts` 注册、在 `apps/web/package.json` 添加工作区依赖。
 
 更完整的架构契约、编码规范与 AI 协作约定见 [AGENTS.md](./AGENTS.md)。

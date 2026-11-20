@@ -7,6 +7,7 @@ import { Card } from '@repo/ui';
 import { cn } from '@repo/utils';
 
 import { useAuth } from '../auth/useAuth';
+import { platformModules, type PlatformModule } from '../platforms';
 
 const ROLE_LABELS: Record<Role, string> = {
   admin: '管理员',
@@ -113,6 +114,11 @@ export function AppShell() {
             ) : null}
           </div>
 
+          {/* 平台模块：与「功能管理」平级，各自渲染动态子菜单 */}
+          {platformModules.map((module) => (
+            <PlatformNavGroup key={module.id} module={module} />
+          ))}
+
           <div className="app-nav__group app-nav__group--bottom">
             <NavLink
               to="/accounts"
@@ -168,6 +174,64 @@ export function AppShell() {
           </div>
         ) : null}
       </main>
+    </div>
+  );
+}
+
+/**
+ * 平台模块导航分组：静态路由项（如「分类管理」）+ 模块提供的动态子菜单（如各分类）。
+ * 与「功能管理」分组平级。
+ */
+function PlatformNavGroup({ module }: { module: PlatformModule }) {
+  const [open, setOpen] = useState(true);
+  const navItems = module.useNavItems();
+  const staticRoutes = module.routes.filter((route) => !route.hidden);
+
+  return (
+    <div className="app-nav__group">
+      <button
+        type="button"
+        className="app-nav__toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span>{module.name}</span>
+        <span
+          className={cn('app-nav__chevron', open && 'app-nav__chevron--open')}
+          aria-hidden="true"
+        >
+          ▾
+        </span>
+      </button>
+
+      {open ? (
+        <div className="app-nav__children">
+          {staticRoutes.map((route) => (
+            <NavLink
+              key={route.path}
+              to={route.path}
+              end
+              className={({ isActive }) =>
+                cn('app-nav__link', 'app-nav__link--sub', isActive && 'app-nav__link--active')
+              }
+            >
+              {route.label}
+            </NavLink>
+          ))}
+
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                cn('app-nav__link', 'app-nav__link--sub', isActive && 'app-nav__link--active')
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
