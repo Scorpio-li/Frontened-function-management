@@ -17,6 +17,7 @@
     "@repo/feature-activity": "workspace:*",
     "@repo/feature-dashboard": "workspace:*",
     "@repo/feature-demo": "workspace:*",
+    "@repo/feature-relationship": "workspace:*",
     "@repo/ui": "workspace:*",
     "@repo/utils": "workspace:*",
     "react": "catalog:",

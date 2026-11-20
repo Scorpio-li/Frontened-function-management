@@ -45,8 +45,6 @@ export function AppShell() {
           </NavLink>
 
           <div className="app-nav__group">
-            <p className="app-nav__title">功能管理</p>
-
             {isAdmin ? (
               <NavLink
                 to="/features"

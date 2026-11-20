@@ -38,6 +38,7 @@ packages/
   feature-dashboard/       # 示例功能：概览
   feature-activity/        # 示例功能：活动流
   feature-demo/            # 示例功能：示例页
+  feature-relationship/    # 示例功能：中文亲戚关系计算器
   eslint-config/           # 共享 ESLint 配置
   FEATURE_INTEGRATION.md   # 功能接入文档（新增功能前必读）
 ```
@@ -65,7 +66,7 @@ packages/
 - 查看者：只能浏览账号列表与各功能页面，看不到也无法访问「功能管理」。
 - 内置管理员由 `FFM_ADMIN_USERNAME`（默认 `admin`）指定，密码只从本地环境变量 `FFM_ADMIN_PASSWORD` 读取；管理员账号不落盘、不可编辑或删除。
 - 登录状态由 HttpOnly Cookie 维持，会话保存在后端内存中，服务重启后需要重新登录（P0 预期行为）。
-- 登录成功后进入首页 `/`；侧边栏「功能管理」分组下展示各已启用功能，账号管理固定在菜单最底部。
+- 登录成功后进入首页 `/`；侧边栏展示各已启用功能，账号管理固定在菜单最底部。
 
 安全提示：`apps/server/.env.local` 与 `apps/server/data/` 均已被 `.gitignore` 忽略，仓库只提供占位用的 `apps/server/.env.example`；请不要提交真实密码或账号数据文件。
 

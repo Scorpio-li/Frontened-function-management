@@ -30,6 +30,7 @@ export default defineConfig({
       '@repo/feature-activity',
       '@repo/feature-dashboard',
       '@repo/feature-demo',
+      '@repo/feature-relationship',
     ],
   },
 });

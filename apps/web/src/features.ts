@@ -2,6 +2,7 @@ import { createEventBus, FeatureRegistry } from '@repo/core';
 import { activityFeature } from '@repo/feature-activity';
 import { dashboardFeature } from '@repo/feature-dashboard';
 import { demoFeature } from '@repo/feature-demo';
+import { relationshipFeature } from '@repo/feature-relationship';
 
 const STORAGE_KEY = 'ffm:disabled-features';
 
@@ -10,6 +11,7 @@ export const featureRegistry = new FeatureRegistry([
   dashboardFeature,
   activityFeature,
   demoFeature,
+  relationshipFeature,
 ]);
 
 export const eventBus = createEventBus();

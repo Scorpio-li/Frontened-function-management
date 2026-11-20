@@ -28,3 +28,4 @@ catalog:
   '@fastify/cookie': ^11.0.2
   tsx: ^4.20.6
   '@types/node': ^24.10.1
+  relationship-ts: ^0.1.1
