@@ -37,52 +37,61 @@ export function AppShell() {
 
         <nav className="app-nav" aria-label="主导航">
           <NavLink
-            to="/functions"
+            to="/"
+            end
             className={({ isActive }) => cn('app-nav__link', isActive && 'app-nav__link--active')}
           >
-            功能列表
+            首页
           </NavLink>
 
-          <NavLink
-            to="/accounts"
-            className={({ isActive }) => cn('app-nav__link', isActive && 'app-nav__link--active')}
-          >
-            账号管理
-          </NavLink>
+          <div className="app-nav__group">
+            <p className="app-nav__title">功能管理</p>
 
-          {isAdmin ? (
-            <NavLink
-              to="/features"
-              className={({ isActive }) => cn('app-nav__link', isActive && 'app-nav__link--active')}
-            >
-              功能管理
-            </NavLink>
-          ) : null}
+            {isAdmin ? (
+              <NavLink
+                to="/features"
+                className={({ isActive }) =>
+                  cn('app-nav__link', isActive && 'app-nav__link--active')
+                }
+              >
+                功能配置
+              </NavLink>
+            ) : null}
 
-          {enabledEntries.map(({ feature }) => {
-            const isMultiRoute = feature.routes.length > 1;
+            {enabledEntries.map(({ feature }) => {
+              const isMultiRoute = feature.routes.length > 1;
 
-            return (
-              <div key={feature.id} className="app-nav__group">
-                {isMultiRoute ? <p className="app-nav__title">{feature.name}</p> : null}
-                {feature.routes.map((route) => {
-                  const to = resolveFeaturePath(feature.id, route.path);
-
-                  return (
+              return (
+                <div key={feature.id} className="app-nav__subgroup">
+                  {isMultiRoute ? <p className="app-nav__subtitle">{feature.name}</p> : null}
+                  {feature.routes.map((route) => (
                     <NavLink
                       key={`${feature.id}:${route.path}`}
-                      to={to}
+                      to={resolveFeaturePath(feature.id, route.path)}
                       className={({ isActive }) =>
-                        cn('app-nav__link', isActive && 'app-nav__link--active')
+                        cn(
+                          'app-nav__link',
+                          'app-nav__link--sub',
+                          isActive && 'app-nav__link--active',
+                        )
                       }
                     >
                       {isMultiRoute ? route.label : feature.name}
                     </NavLink>
-                  );
-                })}
-              </div>
-            );
-          })}
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="app-nav__group app-nav__group--bottom">
+            <NavLink
+              to="/accounts"
+              className={({ isActive }) => cn('app-nav__link', isActive && 'app-nav__link--active')}
+            >
+              账号管理
+            </NavLink>
+          </div>
         </nav>
 
         <div className="app-sidebar__footer">

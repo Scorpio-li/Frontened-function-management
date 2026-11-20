@@ -22,12 +22,12 @@ export function RequireAuth() {
   return <Outlet />;
 }
 
-/** 管理员守卫：非管理员访问受限页面时回到账号管理页。 */
+/** 管理员守卫：非管理员访问受限页面时回到首页。 */
 export function RequireAdmin() {
   const { user } = useAuth();
 
   if (user?.role !== 'admin') {
-    return <Navigate to="/accounts" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <Outlet />;

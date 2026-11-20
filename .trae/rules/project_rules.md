@@ -36,3 +36,7 @@
 ## 5. README.md文档修改
 
 代码有变动时，必须同步更新 [README.md](../../README.md) 文档，保持与代码的一致性。
+
+## 6. 新增功能前先读接入文档
+
+新增或接入功能模块（React、Vue、HTML/CSS/JS、ECharts、Node 等）前，必须先完整阅读 [packages/FEATURE_INTEGRATION.md](../../packages/FEATURE_INTEGRATION.md)，确认接入方式、目录约定与验收清单，再开始编码。

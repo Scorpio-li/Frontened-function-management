@@ -127,6 +127,31 @@ code {
   box-shadow: inset 0 0 0 1px rgba(92, 120, 255, 0.35);
 }
 
+.app-nav__subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-nav__subtitle {
+  margin: 6px 0 2px;
+  padding: 0 12px;
+  color: #7c89b3;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.app-nav__link--sub {
+  padding-left: 24px;
+  font-size: 12.5px;
+}
+
+.app-nav__group--bottom {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .app-sidebar__footer {
   display: flex;
   flex-direction: column;
@@ -253,12 +278,6 @@ code {
 }
 
 .feature-item__meta {
-  font-size: 12px;
-}
-
-.feature-item__url {
-  word-break: break-all;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
 }
 
@@ -475,9 +494,7 @@ code {
   font-weight: 600;
 }
 
-.form-field input,
-.form-field select,
-.form-field textarea {
+.form-field input {
   width: 100%;
   height: 38px;
   padding: 0 12px;
@@ -492,20 +509,7 @@ code {
     box-shadow 0.15s ease;
 }
 
-.form-field select {
-  padding: 0 8px;
-}
-
-.form-field textarea {
-  height: auto;
-  min-height: 88px;
-  padding: 10px 12px;
-  resize: vertical;
-}
-
-.form-field input:focus,
-.form-field select:focus,
-.form-field textarea:focus {
+.form-field input:focus {
   border-color: var(--ffm-color-primary);
   outline: none;
   box-shadow: 0 0 0 3px var(--ffm-color-primary-soft);

@@ -7,15 +7,15 @@ import { Button } from '@repo/ui';
 import { ApiRequestError } from '../api/client';
 import { useAuth } from '../auth/useAuth';
 
-/** 从路由 state 中解析登录后的回跳地址，非法或缺失时回到账号管理页。 */
+/** 从路由 state 中解析登录后的回跳地址，非法或缺失时回到首页。 */
 function resolveRedirectTarget(state: unknown): string {
   if (typeof state !== 'object' || state === null) {
-    return '/accounts';
+    return '/';
   }
 
   const from = (state as { from?: unknown }).from;
   if (typeof from !== 'object' || from === null) {
-    return '/accounts';
+    return '/';
   }
 
   const pathname = (from as { pathname?: unknown }).pathname;
@@ -23,7 +23,7 @@ function resolveRedirectTarget(state: unknown): string {
     return pathname;
   }
 
-  return '/accounts';
+  return '/';
 }
 
 export function LoginPage() {
@@ -36,9 +36,9 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // 已登录用户直接进入账号管理页。
+  // 已登录用户直接进入首页。
   if (status === 'authenticated') {
-    return <Navigate to="/accounts" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const busy = submitting || status === 'loading';

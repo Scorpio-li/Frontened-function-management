@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { resolveFeaturePath, useFeatures } from '@repo/core';
 
@@ -7,7 +7,7 @@ import { RequireAdmin, RequireAuth } from './auth/RequireAuth';
 import { AppShell } from './components/AppShell';
 import { AccountsPage } from './pages/AccountsPage';
 import { FeatureManagerPage } from './pages/FeatureManagerPage';
-import { FeaturesPage } from './pages/FeaturesPage';
+import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -19,8 +19,7 @@ function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          <Route index element={<Navigate to="/accounts" replace />} />
-          <Route path="functions" element={<FeaturesPage />} />
+          <Route index element={<HomePage />} />
           <Route path="accounts" element={<AccountsPage />} />
           <Route element={<RequireAdmin />}>
             <Route path="features" element={<FeatureManagerPage />} />
