@@ -27,6 +27,12 @@ export const demoFeature = defineFeature({
   name: '示例功能',
   description: '面向用户的描述',
   version: '0.1.0',
+  // 在功能页面底部自动展示，供其他项目复用同样能力
+  implementationSteps: [
+    '复制功能包模板并修改包名与功能 id',
+    '在 apps/web/src/features.ts 中注册功能',
+    '运行 pnpm check 验证接入结果',
+  ],
   setup({ eventBus }) {
     // 启动时执行一次，可注册事件监听
   },
@@ -171,6 +177,7 @@ window.parent.postMessage({ type: 'tool:ready' }, targetOrigin);
 - [ ] 没有导入 `apps/web` 或其他 `feature-*` 包
 - [ ] 没有全局 CSS 污染，样式使用独立前缀
 - [ ] iframe 场景已验证同源/跨域、登录态与高度显示
+- [ ] 已在 `defineFeature` 中填写 `implementationSteps`，功能页面底部可见「实现步骤」
 - [ ] 已运行 `pnpm check`（lint / typecheck / test / build）
 
 ## 11. 常见问题
@@ -183,3 +190,34 @@ window.parent.postMessage({ type: 'tool:ready' }, targetOrigin);
 | Vue 组件样式污染宿主  | 使用 scoped 样式或 Shadow DOM（Custom Element），不要写全局选择器 |
 | Node 服务接口跨域失败 | 开发环境配置 Vite 代理，生产环境用反向代理统一域名                |
 | 打包体积过大          | 避免在 React 包中同时引入 Vue/ECharts 全量包，优先 iframe 隔离    |
+
+## 12. 功能实现步骤（强制）
+
+每个功能都必须在 `defineFeature` 中提供 `implementationSteps`：
+
+```ts
+export const demoFeature = defineFeature({
+  id: 'demo',
+  name: '示例功能',
+  implementationSteps: [
+    {
+      text: '在功能包中安装依赖',
+      code: 'pnpm add <library>',
+    },
+    {
+      text: '在页面中初始化并渲染组件',
+      code: `const instance = new DemoLibrary(container);
+instance.render();`,
+    },
+    { text: '在 apps/web/src/features.ts 注册功能' },
+    { text: '运行 pnpm check 验证', code: 'pnpm check' },
+  ],
+  routes: [{ path: '', label: '示例', element: DemoPage }],
+});
+```
+
+- 宿主会在对应功能页面下方自动渲染这些步骤，标题为「实现步骤」。
+- 每个步骤包含 `text` 必填说明，相关代码实现放在可选的 `code` 字段中，会以代码块展示。
+- 步骤应写成「其他项目接入同样能力」的可执行动作，包含依赖安装、初始化方式、注册与验证。
+- 新增功能未填写 `implementationSteps` 时，代码评审不应通过。
+- 接入方式为 iframe / 独立服务时，步骤中需说明静态资源放置位置、代理配置或部署要求。

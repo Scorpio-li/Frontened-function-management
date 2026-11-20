@@ -1,7 +1,9 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import type { Role } from '@repo/contracts';
 import { resolveFeaturePath, useFeatures } from '@repo/core';
+import { Card } from '@repo/ui';
 import { cn } from '@repo/utils';
 
 import { useAuth } from '../auth/useAuth';
@@ -16,8 +18,18 @@ export function AppShell() {
   const enabledEntries = entries.filter((entry) => entry.enabled);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const isAdmin = user?.role === 'admin';
+
+  const [featureMenuOpen, setFeatureMenuOpen] = useState(true);
+
+  // 当前路由所属功能，用于在页面底部展示该功能的实现步骤。
+  const activeFeature = enabledEntries.find(({ feature }) => {
+    const base = `/${feature.id}`;
+    return location.pathname === base || location.pathname.startsWith(`${base}/`);
+  })?.feature;
+  const implementationSteps = activeFeature?.implementationSteps ?? [];
 
   async function handleLogout(): Promise<void> {
     await logout();
@@ -45,41 +57,60 @@ export function AppShell() {
           </NavLink>
 
           <div className="app-nav__group">
-            {isAdmin ? (
-              <NavLink
-                to="/features"
-                className={({ isActive }) =>
-                  cn('app-nav__link', isActive && 'app-nav__link--active')
-                }
+            <button
+              type="button"
+              className="app-nav__toggle"
+              aria-expanded={featureMenuOpen}
+              onClick={() => setFeatureMenuOpen((open) => !open)}
+            >
+              <span>功能管理</span>
+              <span
+                className={cn('app-nav__chevron', featureMenuOpen && 'app-nav__chevron--open')}
+                aria-hidden="true"
               >
-                功能配置
-              </NavLink>
+                ▾
+              </span>
+            </button>
+
+            {featureMenuOpen ? (
+              <div className="app-nav__children">
+                {isAdmin ? (
+                  <NavLink
+                    to="/features"
+                    className={({ isActive }) =>
+                      cn('app-nav__link', 'app-nav__link--sub', isActive && 'app-nav__link--active')
+                    }
+                  >
+                    功能配置
+                  </NavLink>
+                ) : null}
+
+                {enabledEntries.map(({ feature }) => {
+                  const isMultiRoute = feature.routes.length > 1;
+
+                  return (
+                    <div key={feature.id} className="app-nav__subgroup">
+                      {isMultiRoute ? <p className="app-nav__subtitle">{feature.name}</p> : null}
+                      {feature.routes.map((route) => (
+                        <NavLink
+                          key={`${feature.id}:${route.path}`}
+                          to={resolveFeaturePath(feature.id, route.path)}
+                          className={({ isActive }) =>
+                            cn(
+                              'app-nav__link',
+                              'app-nav__link--sub',
+                              isActive && 'app-nav__link--active',
+                            )
+                          }
+                        >
+                          {isMultiRoute ? route.label : feature.name}
+                        </NavLink>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
             ) : null}
-
-            {enabledEntries.map(({ feature }) => {
-              const isMultiRoute = feature.routes.length > 1;
-
-              return (
-                <div key={feature.id} className="app-nav__subgroup">
-                  {isMultiRoute ? <p className="app-nav__subtitle">{feature.name}</p> : null}
-                  {feature.routes.map((route) => (
-                    <NavLink
-                      key={`${feature.id}:${route.path}`}
-                      to={resolveFeaturePath(feature.id, route.path)}
-                      className={({ isActive }) =>
-                        cn(
-                          'app-nav__link',
-                          'app-nav__link--sub',
-                          isActive && 'app-nav__link--active',
-                        )
-                      }
-                    >
-                      {isMultiRoute ? route.label : feature.name}
-                    </NavLink>
-                  ))}
-                </div>
-              );
-            })}
           </div>
 
           <div className="app-nav__group app-nav__group--bottom">
@@ -111,6 +142,31 @@ export function AppShell() {
 
       <main className="app-main">
         <Outlet />
+
+        {implementationSteps.length > 0 ? (
+          <div className="feature-implementation">
+            <Card
+              title="实现步骤"
+              description={`在其他项目中复用「${activeFeature?.name ?? ''}」的步骤。`}
+            >
+              <ol className="ffm-steps">
+                {implementationSteps.map((step, index) => (
+                  <li key={step.text} className="ffm-steps__item">
+                    <span className="ffm-steps__index">{index + 1}</span>
+                    <div className="ffm-steps__content">
+                      <span>{step.text}</span>
+                      {step.code ? (
+                        <pre className="ffm-steps__code">
+                          <code>{step.code}</code>
+                        </pre>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          </div>
+        ) : null}
       </main>
     </div>
   );

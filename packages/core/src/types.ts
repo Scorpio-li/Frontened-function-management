@@ -17,6 +17,13 @@ export interface FeatureSetupContext {
   readonly eventBus: EventBus;
 }
 
+/** 功能实现步骤，供其他项目复用同样能力。 */
+export interface FeatureImplementationStep {
+  readonly text: string;
+  /** 与步骤对应的代码示例，可选。 */
+  readonly code?: string;
+}
+
 /**
  * 功能模块的声明式契约。
  * 功能包只描述元信息、路由与初始化逻辑，宿主负责渲染与导航。
@@ -27,6 +34,11 @@ export interface Feature {
   readonly description?: string;
   readonly version?: string;
   readonly routes: readonly FeatureRoute[];
+  /**
+   * 功能实现步骤，会展示在功能页面下方，方便在其他项目中复用同样能力。
+   * 新增功能时必须填写。
+   */
+  readonly implementationSteps?: readonly FeatureImplementationStep[];
   /** 应用启动时执行一次，适合注册事件监听等副作用。 */
   setup?(context: FeatureSetupContext): void;
 }

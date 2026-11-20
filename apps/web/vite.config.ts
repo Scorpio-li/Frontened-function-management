@@ -31,6 +31,11 @@ export default defineConfig({
       '@repo/feature-dashboard',
       '@repo/feature-demo',
       '@repo/feature-relationship',
+      '@repo/feature-heatmap',
+      '@repo/feature-annotation',
+      '@repo/feature-pdf-export',
+      '@repo/feature-infographic',
+      '@repo/feature-guide',
     ],
   },
 });

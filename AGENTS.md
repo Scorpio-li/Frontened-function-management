@@ -51,6 +51,11 @@
 │   ├── feature-dashboard/        # 示例功能包：概览
 │   ├── feature-activity/         # 示例功能包：活动流（演示事件总线）
 │   ├── feature-relationship/     # 示例功能包：中文亲戚关系计算器
+│   ├── feature-heatmap/          # 示例功能包：Heat.js 数据热力图
+│   ├── feature-annotation/       # 示例功能包：Fabric.js 图片标注
+│   ├── feature-pdf-export/       # 示例功能包：dompdf.js 网页转 PDF
+│   ├── feature-infographic/      # 示例功能包：AntV 信息图
+│   ├── feature-guide/            # 示例功能包：intro.js 新手引导
 │   └── eslint-config/            # 共享 ESLint 配置（不参与构建）
 ├── pnpm-workspace.yaml           # 工作区与依赖版本 Catalog
 ├── turbo.json                    # 任务管道与缓存策略
@@ -99,6 +104,10 @@ export const demoFeature = defineFeature({
   name: '示例功能',
   description: '一段面向用户的描述',
   version: '0.1.0',
+  implementationSteps: [
+    { text: '安装依赖', code: 'pnpm add <library>' },
+    { text: '在 features.ts 注册' },
+  ],
   setup({ eventBus }) {
     // 应用启动时执行一次，用于注册事件监听等
   },
@@ -114,6 +123,7 @@ export const demoFeature = defineFeature({
 - 包名统一为 `@repo/feature-<id>`，`id` 全局唯一，注册表会拒绝重复或空 id。
 - `routes[].path` 为相对路径，空字符串代表该功能首页；最终地址为 `/<featureId>/<path>`。
 - `routes[].element` 是 React 组件，功能包自行组织页面、组件与状态。
+- 每个功能必须提供 `implementationSteps`，宿主会渲染在功能页面下方，说明其他项目如何复用同样能力。
 - `setup` 在应用启动时对**所有**已注册功能执行一次，与当前是否启用无关；因此可安全地用它注册全局事件监听，停用功能只影响路由与导航。
 - `setup` 中只做轻量初始化（如注册事件监听），不要执行重 CPU 任务或直接操作 DOM。
 - 功能包不得导入 `apps/web`，也不得导入其他 `feature-*` 包；跨模块通信走事件总线。

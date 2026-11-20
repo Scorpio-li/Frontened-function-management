@@ -29,3 +29,8 @@ catalog:
   tsx: ^4.20.6
   '@types/node': ^24.10.1
   relationship-ts: ^0.1.1
+  jheat.js: ^5.2.0
+  fabric: ^7.4.0
+  dompdf.js: ^2.0.8
+  '@antv/infographic': ^0.2.20
+  intro.js: ^8.6.0

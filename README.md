@@ -39,6 +39,11 @@ packages/
   feature-activity/        # 示例功能：活动流
   feature-demo/            # 示例功能：示例页
   feature-relationship/    # 示例功能：中文亲戚关系计算器
+  feature-heatmap/         # 示例功能：Heat.js 数据热力图
+  feature-annotation/      # 示例功能：Fabric.js 图片标注
+  feature-pdf-export/      # 示例功能：dompdf.js 网页转 PDF
+  feature-infographic/     # 示例功能：AntV 信息图
+  feature-guide/           # 示例功能：intro.js 新手引导
   eslint-config/           # 共享 ESLint 配置
   FEATURE_INTEGRATION.md   # 功能接入文档（新增功能前必读）
 ```

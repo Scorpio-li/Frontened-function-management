@@ -7,3 +7,4 @@
 | 需求                                                                 | 状态         | 说明                                                |
 | -------------------------------------------------------------------- | ------------ | --------------------------------------------------- |
 | [add-account-auth-management](./add-account-auth-management/spec.md) | 已实现并验收 | P0 账号登录、账号增删改查与 admin / viewer 角色隔离 |
+| [feature-configuration](./feature-configuration/spec.md)             | 需求文档     | 功能配置：功能列表、启停、导航联动、权限与实现步骤  |
