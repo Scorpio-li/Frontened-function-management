@@ -37,6 +37,13 @@ export function AppShell() {
 
         <nav className="app-nav" aria-label="主导航">
           <NavLink
+            to="/functions"
+            className={({ isActive }) => cn('app-nav__link', isActive && 'app-nav__link--active')}
+          >
+            功能列表
+          </NavLink>
+
+          <NavLink
             to="/accounts"
             className={({ isActive }) => cn('app-nav__link', isActive && 'app-nav__link--active')}
           >

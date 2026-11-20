@@ -58,3 +58,47 @@ export const USERNAME_MIN_LENGTH = 3;
 export const USERNAME_MAX_LENGTH = 32;
 /** 密码最小长度。 */
 export const PASSWORD_MIN_LENGTH = 8;
+
+/** 功能类型：对应平台上登记的不同技术栈项目。 */
+export type FeatureKind = 'html' | 'css' | 'vue' | 'react' | 'echarts' | 'node' | 'other';
+
+export const FEATURE_KINDS: readonly FeatureKind[] = [
+  'html',
+  'css',
+  'vue',
+  'react',
+  'echarts',
+  'node',
+  'other',
+];
+
+export const FEATURE_NAME_MAX_LENGTH = 50;
+export const FEATURE_DESCRIPTION_MAX_LENGTH = 200;
+export const FEATURE_URL_MAX_LENGTH = 500;
+
+/** 平台登记的功能条目，所有已登录用户均可查看。 */
+export interface FeatureItem {
+  id: string;
+  name: string;
+  description: string;
+  kind: FeatureKind;
+  /** 可访问地址：http(s) 绝对地址或以 / 开头的站内相对路径。 */
+  url: string;
+  createdAt: string; // ISO 字符串
+  updatedAt: string; // ISO 字符串
+}
+
+export interface CreateFeatureRequest {
+  name: string;
+  description?: string;
+  kind: FeatureKind;
+  url: string;
+}
+
+/** 更新功能条目：所有字段可选，但不能全部为空。 */
+export interface UpdateFeatureRequest {
+  name?: string;
+  description?: string;
+  kind?: FeatureKind;
+  url?: string;
+}

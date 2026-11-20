@@ -1,3 +1,14 @@
+<!--
+ * @Author: Derick.lizhiliang
+ * @Date: 2026-11-19 22:59:51
+ * @email: lzl102872@163.com
+ * @LastEditors: Derick.lizhiliang
+ * @LastEditTime: 2026-11-20 09:47:53
+ * @motto: Still water run deep
+ * @Description: Modify here please
+ * @FilePath: /Frontened-function-management/.trae/rules/project_rules.md
+-->
+
 # 项目规则
 
 以下规则在每次任务中都必须遵守，与 [AGENTS.md](../../AGENTS.md) 共同作为本仓库的协作约定。
@@ -21,3 +32,7 @@
 - 新建分支前先确认当前分支：`git rev-parse --abbrev-ref HEAD`。
 - 分支命名保持语义化，例如 `feat/<主题>`、`fix/<主题>`、`docs/<主题>`。
 - 不要在 `master` / `main` 或其他非 `dev` 分支上直接改动文件。
+
+## 5. README.md文档修改
+
+代码有变动时，必须同步更新 [README.md](../../README.md) 文档，保持与代码的一致性。

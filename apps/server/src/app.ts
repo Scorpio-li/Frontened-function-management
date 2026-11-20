@@ -2,8 +2,25 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import cookie from '@fastify/cookie';
 import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { ADMIN_USERNAME, PASSWORD_MIN_LENGTH, USERNAME_PATTERN } from '@repo/contracts';
-import type { Account, ApiError, ApiErrorCode, AuthResponse, CurrentUser } from '@repo/contracts';
+import {
+  ADMIN_USERNAME,
+  FEATURE_DESCRIPTION_MAX_LENGTH,
+  FEATURE_KINDS,
+  FEATURE_NAME_MAX_LENGTH,
+  FEATURE_URL_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from '@repo/contracts';
+import type {
+  Account,
+  ApiError,
+  ApiErrorCode,
+  AuthResponse,
+  CurrentUser,
+  FeatureItem,
+  FeatureKind,
+} from '@repo/contracts';
+import { FeatureStore } from './feature-store';
 import { hashPassword, verifyPassword } from './password';
 import { SESSION_COOKIE_NAME, SessionStore } from './session';
 import { AccountStore, DuplicateUsernameError, normalizeUsername } from './store';
@@ -43,6 +60,42 @@ function toPublicAccount(stored: StoredAccount): Account {
     createdAt: stored.createdAt,
     updatedAt: stored.updatedAt,
   };
+}
+
+/** 校验功能名称：去空格后 1–50 个字符。 */
+function readFeatureName(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const name = value.trim();
+  return name.length > 0 && name.length <= FEATURE_NAME_MAX_LENGTH ? name : null;
+}
+
+/** 校验功能描述：缺省为空字符串，存在时不得超过长度上限。 */
+function readFeatureDescription(value: unknown): string | null {
+  if (value === undefined || value === null) return '';
+  if (typeof value !== 'string') return null;
+  const description = value.trim();
+  return description.length <= FEATURE_DESCRIPTION_MAX_LENGTH ? description : null;
+}
+
+function readFeatureKind(value: unknown): FeatureKind | null {
+  return typeof value === 'string' && (FEATURE_KINDS as readonly string[]).includes(value)
+    ? (value as FeatureKind)
+    : null;
+}
+
+/** 校验功能地址：http(s) 绝对地址或以 / 开头的站内路径。 */
+function readFeatureUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const url = value.trim();
+  if (url === '' || url.length > FEATURE_URL_MAX_LENGTH) return null;
+  if (url.startsWith('/')) return url;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? url : null;
+  } catch {
+    return null;
+  }
 }
 
 function sendError(
@@ -93,6 +146,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   const store = new AccountStore(options.dataDir);
   await store.init();
+  const featureStore = new FeatureStore(options.dataDir);
+  await featureStore.init();
   const sessions = new SessionStore(sessionTtlMs);
 
   function resolveCurrentUser(request: FastifyRequest): CurrentUser | null {
@@ -330,6 +385,168 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     }
     // 删除账号后让其所有会话立即失效。
     sessions.destroyByAccount(id);
+    return reply.code(204).send();
+  });
+
+  app.get('/api/features', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) {
+      return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    }
+
+    const features = featureStore
+      .list()
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    return reply.send(features);
+  });
+
+  app.post('/api/features', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) {
+      return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    }
+    if (user.role !== 'admin') {
+      return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+    }
+
+    const body: unknown = request.body;
+    if (!isRecord(body)) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', '请求参数格式不正确');
+    }
+
+    const name = readFeatureName(body.name);
+    if (name === null) {
+      return sendError(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        `功能名称需为 1–${FEATURE_NAME_MAX_LENGTH} 个字符`,
+      );
+    }
+    const description = readFeatureDescription(body.description);
+    if (description === null) {
+      return sendError(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        `功能描述不能超过 ${FEATURE_DESCRIPTION_MAX_LENGTH} 个字符`,
+      );
+    }
+    const kind = readFeatureKind(body.kind);
+    if (kind === null) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', '功能类型不合法');
+    }
+    const url = readFeatureUrl(body.url);
+    if (url === null) {
+      return sendError(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        '功能地址需为 http(s) 链接或以 / 开头的站内路径',
+      );
+    }
+
+    const created = await featureStore.create({ name, description, kind, url });
+    const payload: FeatureItem = created;
+    return reply.code(201).send(payload);
+  });
+
+  app.patch<{ Params: { id: string } }>('/api/features/:id', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) {
+      return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    }
+    if (user.role !== 'admin') {
+      return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+    }
+
+    const { id } = request.params;
+    if (!featureStore.findById(id)) {
+      return sendError(reply, 404, 'NOT_FOUND', '功能不存在');
+    }
+
+    const body: unknown = request.body;
+    if (!isRecord(body)) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', '请求参数格式不正确');
+    }
+
+    const hasName = 'name' in body && body.name !== undefined;
+    const hasDescription = 'description' in body && body.description !== undefined;
+    const hasKind = 'kind' in body && body.kind !== undefined;
+    const hasUrl = 'url' in body && body.url !== undefined;
+    if (!hasName && !hasDescription && !hasKind && !hasUrl) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', '请至少提供一个要修改的字段');
+    }
+
+    const changes: { name?: string; description?: string; kind?: FeatureKind; url?: string } = {};
+
+    if (hasName) {
+      const name = readFeatureName(body.name);
+      if (name === null) {
+        return sendError(
+          reply,
+          400,
+          'VALIDATION_ERROR',
+          `功能名称需为 1–${FEATURE_NAME_MAX_LENGTH} 个字符`,
+        );
+      }
+      changes.name = name;
+    }
+
+    if (hasDescription) {
+      const description = readFeatureDescription(body.description);
+      if (description === null) {
+        return sendError(
+          reply,
+          400,
+          'VALIDATION_ERROR',
+          `功能描述不能超过 ${FEATURE_DESCRIPTION_MAX_LENGTH} 个字符`,
+        );
+      }
+      changes.description = description;
+    }
+
+    if (hasKind) {
+      const kind = readFeatureKind(body.kind);
+      if (kind === null) {
+        return sendError(reply, 400, 'VALIDATION_ERROR', '功能类型不合法');
+      }
+      changes.kind = kind;
+    }
+
+    if (hasUrl) {
+      const url = readFeatureUrl(body.url);
+      if (url === null) {
+        return sendError(
+          reply,
+          400,
+          'VALIDATION_ERROR',
+          '功能地址需为 http(s) 链接或以 / 开头的站内路径',
+        );
+      }
+      changes.url = url;
+    }
+
+    const updated = await featureStore.update(id, changes);
+    if (!updated) {
+      return sendError(reply, 404, 'NOT_FOUND', '功能不存在');
+    }
+    return reply.send(updated);
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/features/:id', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) {
+      return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    }
+    if (user.role !== 'admin') {
+      return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+    }
+
+    const removed = await featureStore.remove(request.params.id);
+    if (!removed) {
+      return sendError(reply, 404, 'NOT_FOUND', '功能不存在');
+    }
     return reply.code(204).send();
   });
 

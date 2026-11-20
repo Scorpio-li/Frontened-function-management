@@ -10,6 +10,7 @@
 - **功能包**以 `@repo/feature-*` 独立开发、独立构建，不直接依赖宿主。
 - 新增一个功能模块的标准动作是：新建功能包 → 在宿主注册，而不是在宿主里堆页面代码。
 - 当前已内置账号登录与账号管理（P0）：由 `apps/server` 提供认证与账号 API，宿主默认需要登录才能访问业务页面。
+- 已内置功能列表：管理员登记、编辑、删除功能条目（名称、类型、访问地址、描述），查看者只读并可在新窗口打开；数据落在 `apps/server/data/features.json`。
 
 ## 2. 技术栈
 
@@ -38,10 +39,10 @@
 │   │       ├── App.tsx           # 根据注册表动态生成路由 + 认证/角色守卫
 │   │       ├── auth/             # 认证上下文、登录态恢复、RequireAuth / RequireAdmin
 │   │       ├── components/AppShell.tsx
-│   │       └── pages/            # 宿主自身页面（登录、账号管理、功能管理、404）
-│   └── server/                   # 本地 Node 后端：认证与账号管理 API（Fastify）
-│       ├── src/                  # app / config / store / session / password 与测试
-│       └── data/                 # 账号 JSON 存储目录（本地生成，已被 .gitignore 忽略）
+│   │       └── pages/            # 宿主自身页面（登录、功能列表、账号管理、功能管理、404）
+│   └── server/                   # 本地 Node 后端：认证、账号与功能列表 API（Fastify）
+│       ├── src/                  # app / config / store / feature-store / session / password 与测试
+│       └── data/                 # 账号与功能 JSON 存储目录（本地生成，已被 .gitignore 忽略）
 ├── packages/
 │   ├── core/                     # 插件内核：FeatureRegistry / EventBus / React 运行时
 │   ├── contracts/                # 前后端共享的账号、角色、DTO、错误码与校验常量
@@ -198,6 +199,10 @@ apps/server → @repo/contracts
 | POST   | `/api/accounts`     | admin  | 创建 viewer 账号           |
 | PATCH  | `/api/accounts/:id` | admin  | 修改用户名或密码           |
 | DELETE | `/api/accounts/:id` | admin  | 删除 viewer 账号           |
+| GET    | `/api/features`     | 已登录 | 功能列表                   |
+| POST   | `/api/features`     | admin  | 新增功能条目               |
+| PATCH  | `/api/features/:id` | admin  | 修改功能条目               |
+| DELETE | `/api/features/:id` | admin  | 删除功能条目               |
 
 错误语义：未登录 `401`；已登录但无权限 `403`；参数错误 `400`；资源不存在 `404`；用户名重复 `409`；未预期异常 `500`。
 
@@ -212,13 +217,14 @@ apps/server → @repo/contracts
 - `/login` 为登录页；应用启动时调用 `GET /api/auth/me` 恢复会话，任意接口返回 `401` 时清除前端登录态。
 - 未登录访问任意业务路由会跳转 `/login`，登录成功后回跳原目标页。
 - `/accounts` 为账号管理页：admin 可增删改（删除前二次确认），viewer 只读。
+- `/functions` 为功能列表页：所有已登录用户可见，admin 可增删改（删除前二次确认），viewer 只读；点击「打开」在新窗口访问登记的地址。
 - `/features` 功能管理页仅 admin 可访问；viewer 侧边栏不渲染该入口，直接访问会被重定向到 `/accounts`。
 - 根路径 `/` 重定向到 `/accounts`；侧边栏底部显示用户名、角色与退出登录。
 
 ### 6.5 敏感数据约定
 
 - 仓库只提供 `apps/server/.env.example` 占位值，真实密码写在本地 `apps/server/.env.local`。
-- `.env.local` 与 `apps/server/data/`（含 `accounts.json`）已被 `.gitignore` 忽略，不得提交。
+- `.env.local` 与 `apps/server/data/`（含 `accounts.json`、`features.json`）已被 `.gitignore` 忽略，不得提交。
 - 密码以 scrypt 哈希（`salt:hash`）落盘；代码、文档、接口响应中都不得出现明文密码。
 
 ## 7. 新增功能模块

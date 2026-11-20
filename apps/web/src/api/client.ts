@@ -4,8 +4,11 @@ import type {
   ApiErrorCode,
   AuthResponse,
   CreateAccountRequest,
+  CreateFeatureRequest,
+  FeatureItem,
   LoginRequest,
   UpdateAccountRequest,
+  UpdateFeatureRequest,
 } from '@repo/contracts';
 
 /** 统一前缀，开发环境由 Vite 代理转发到本地后端。 */
@@ -124,5 +127,27 @@ export const api = {
 
   deleteAccount(id: string): Promise<void> {
     return request<void>(`/accounts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  listFeatures(): Promise<FeatureItem[]> {
+    return request<FeatureItem[]>('/features');
+  },
+
+  createFeature(payload: CreateFeatureRequest): Promise<FeatureItem> {
+    return request<FeatureItem>('/features', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateFeature(id: string, payload: UpdateFeatureRequest): Promise<FeatureItem> {
+    return request<FeatureItem>(`/features/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteFeature(id: string): Promise<void> {
+    return request<void>(`/features/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
 };
