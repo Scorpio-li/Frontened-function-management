@@ -5,7 +5,9 @@ import { dashboardFeature } from '@repo/feature-dashboard';
 import { demoFeature } from '@repo/feature-demo';
 import { guideFeature } from '@repo/feature-guide';
 import { heatmapFeature } from '@repo/feature-heatmap';
+import { i18nConverterFeature } from '@repo/feature-i18n-converter';
 import { infographicFeature } from '@repo/feature-infographic';
+import { mailFeature } from '@repo/feature-mail';
 import { pdfExportFeature } from '@repo/feature-pdf-export';
 import { relationshipFeature } from '@repo/feature-relationship';
 
@@ -22,6 +24,8 @@ export const featureRegistry = new FeatureRegistry([
   pdfExportFeature,
   infographicFeature,
   guideFeature,
+  i18nConverterFeature,
+  mailFeature,
 ]);
 
 export const eventBus = createEventBus();

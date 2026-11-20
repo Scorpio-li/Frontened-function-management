@@ -766,3 +766,453 @@ code {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
+
+/* 通用按钮 */
+.ffm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: var(--ffm-radius-sm);
+  background: #fff;
+  color: var(--ffm-color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.ffm-btn:hover:not(:disabled) {
+  box-shadow: 0 2px 6px rgba(16, 23, 40, 0.08);
+}
+
+.ffm-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ffm-btn-primary {
+  border-color: var(--ffm-color-primary);
+  background: var(--ffm-color-primary);
+  color: #fff;
+}
+
+.ffm-btn-primary:hover:not(:disabled) {
+  background: #2d4ae0;
+  border-color: #2d4ae0;
+}
+
+.ffm-btn-success {
+  border-color: #22c55e;
+  background: #22c55e;
+  color: #fff;
+}
+
+.ffm-btn-success:hover:not(:disabled) {
+  background: #16a34a;
+  border-color: #16a34a;
+}
+
+/* i18n 转换页面 */
+.ffm-i18n-page {
+  max-width: 880px;
+}
+
+.ffm-i18n-title {
+  margin: 0 0 24px;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.ffm-i18n-section {
+  margin-bottom: 24px;
+  padding: 20px 22px;
+  border: 1px solid var(--ffm-color-border);
+  border-radius: var(--ffm-radius-lg);
+  background: var(--ffm-color-surface);
+}
+
+.ffm-i18n-subtitle {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ffm-color-muted);
+}
+
+.ffm-i18n-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--ffm-color-border);
+  border-radius: var(--ffm-radius-md);
+  background: #fafbff;
+  color: var(--ffm-color-text);
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  resize: vertical;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.ffm-i18n-textarea:focus {
+  border-color: var(--ffm-color-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ffm-color-primary-soft);
+}
+
+.ffm-i18n-meta {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.ffm-i18n-valid {
+  color: var(--ffm-color-success, #22c55e);
+}
+
+.ffm-i18n-invalid {
+  color: var(--ffm-color-danger, #ef4444);
+}
+
+.ffm-i18n-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ffm-i18n-upload {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ffm-btn-upload {
+  cursor: pointer;
+}
+
+.ffm-i18n-hint {
+  color: var(--ffm-color-muted);
+  font-size: 12px;
+}
+
+.ffm-i18n-error {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid #f3c6c6;
+  border-radius: var(--ffm-radius-md);
+  background: #fef2f2;
+  color: var(--ffm-color-danger, #ef4444);
+  font-size: 13px;
+}
+
+.ffm-i18n-result {
+  max-height: 320px;
+  margin: 0 0 12px;
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid var(--ffm-color-border);
+  border-radius: var(--ffm-radius-md);
+  background: #fafbff;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.ffm-i18n-toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  padding: 10px 20px;
+  border-radius: var(--ffm-radius-md);
+  background: rgba(16, 23, 40, 0.88);
+  color: #fff;
+  font-size: 13px;
+  transform: translateX(-50%);
+  animation: ffm-fadein 0.2s ease;
+  pointer-events: none;
+  z-index: 100;
+}
+
+@keyframes ffm-fadein {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* 邮件发送页面 */
+.ffm-mail-page {
+  max-width: 620px;
+}
+
+.ffm-mail-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.ffm-mail-desc {
+  margin: 0 0 24px;
+  color: var(--ffm-color-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ffm-mail-desc code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f2f4f9;
+  color: var(--ffm-color-muted);
+  font-size: 12px;
+}
+
+.ffm-mail-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 26px;
+  border: 1px solid var(--ffm-color-border);
+  border-radius: var(--ffm-radius-lg);
+  background: var(--ffm-color-surface);
+}
+
+.ffm-mail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ffm-mail-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ffm-mail-input,
+.ffm-mail-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ffm-color-border);
+  border-radius: var(--ffm-radius-md);
+  background: #fafbff;
+  color: var(--ffm-color-text);
+  font: inherit;
+  font-size: 13px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.ffm-mail-input:focus,
+.ffm-mail-textarea:focus {
+  border-color: var(--ffm-color-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ffm-color-primary-soft);
+}
+
+.ffm-mail-textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.ffm-mail-checkbox label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.ffm-mail-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.ffm-mail-submit {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.ffm-mail-result {
+  padding: 10px 14px;
+  border-radius: var(--ffm-radius-md);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ffm-mail-success {
+  border: 1px solid #bfe6cd;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.ffm-mail-error {
+  border: 1px solid #f3c6c6;
+  background: #fef2f2;
+  color: var(--ffm-color-danger, #ef4444);
+}
+
+/* SMTP 配置状态横幅 */
+.ffm-mail-status {
+  margin-bottom: 22px;
+  padding: 14px 18px;
+  border: 1px solid var(--ffm-color-border);
+  border-radius: var(--ffm-radius-md);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ffm-mail-status--loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8f9fc;
+  color: var(--ffm-color-muted);
+}
+
+.ffm-mail-status__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #94a3b8;
+  animation: ffm-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ffm-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.ffm-mail-status--warn {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.ffm-mail-status--ok {
+  border-color: #bfe6cd;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.ffm-mail-status__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.ffm-mail-status__icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ffm-mail-status__header strong {
+  font-size: 13.5px;
+}
+
+.ffm-mail-status__test {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid #16a34a;
+  border-radius: var(--ffm-radius-sm);
+  background: transparent;
+  color: #16a34a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.ffm-mail-status__test:hover:not(:disabled) {
+  background: #16a34a;
+  color: #fff;
+}
+
+.ffm-mail-status__test:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ffm-mail-status__text {
+  margin: 4px 0 0;
+  color: inherit;
+  font-size: 12.5px;
+}
+
+.ffm-mail-status__text--ok {
+  color: #15803d;
+}
+
+.ffm-mail-status__text--err {
+  color: #b91c1c;
+}
+
+.ffm-mail-status__text--hint {
+  color: #65a30d;
+  font-style: italic;
+}
+
+.ffm-mail-status__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 8px 0 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.ffm-mail-status__list li code {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(16, 23, 40, 0.06);
+  color: #92400e;
+  font-size: 12px;
+}
+
+.ffm-mail-status__example {
+  margin-top: 10px;
+  color: #78350f;
+}
+
+.ffm-mail-status__example summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #92400e;
+  user-select: none;
+}
+
+.ffm-mail-status__example pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--ffm-radius-sm);
+  background: #1f2937;
+  color: #e5e7eb;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
+}

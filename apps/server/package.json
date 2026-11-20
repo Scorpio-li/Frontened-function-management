@@ -15,10 +15,12 @@
   "dependencies": {
     "@fastify/cookie": "catalog:",
     "@repo/contracts": "workspace:*",
-    "fastify": "catalog:"
+    "fastify": "catalog:",
+    "nodemailer": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/nodemailer": "^6.4.17",
     "eslint": "catalog:",
     "tsup": "catalog:",
     "tsx": "catalog:",

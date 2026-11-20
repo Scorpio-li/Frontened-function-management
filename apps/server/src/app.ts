@@ -8,6 +8,7 @@ import { hashPassword, verifyPassword } from './password';
 import { SESSION_COOKIE_NAME, SessionStore } from './session';
 import { AccountStore, DuplicateUsernameError, normalizeUsername } from './store';
 import type { StoredAccount } from './store';
+import { readSmtpConfig, sendMail, verifySmtpConnection } from './mailer';
 
 /** 内置管理员固定 id。 */
 const ADMIN_ID = 'admin';
@@ -331,6 +332,78 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     // 删除账号后让其所有会话立即失效。
     sessions.destroyByAccount(id);
     return reply.code(204).send();
+  });
+
+  /** 邮件发送接口。需要登录态 + 已配置 SMTP。 */
+  app.post('/api/mail/send', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) {
+      return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    }
+
+    if (!readSmtpConfig()) {
+      return sendError(
+        reply,
+        503,
+        'INTERNAL_ERROR',
+        'SMTP 未配置，请在 apps/server/.env.local 中设置 SMTP_HOST / SMTP_USER / SMTP_PASS',
+      );
+    }
+
+    const body: unknown = request.body;
+    if (!isRecord(body)) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', '请求参数格式不正确');
+    }
+
+    const to = typeof body.to === 'string' ? body.to.trim() : '';
+    const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
+    const text = typeof body.text === 'string' ? body.text : undefined;
+    const html = typeof body.html === 'string' ? body.html : undefined;
+
+    if (!to) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', '收件人地址不能为空');
+    }
+    if (!subject) {
+      return sendError(reply, 400, 'VALIDATION_ERROR', '邮件主题不能为空');
+    }
+    if (!text && !html) {
+      return sendError(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        '邮件正文不能为空（text 或 html 至少提供一个）',
+      );
+    }
+
+    try {
+      const result = await sendMail({ to, subject, text, html });
+      return reply.send({ message: '邮件发送成功', messageId: result.messageId });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '邮件发送失败';
+      return sendError(reply, 502, 'INTERNAL_ERROR', message);
+    }
+  });
+
+  app.get('/api/mail/configured', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) {
+      return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    }
+    return { configured: readSmtpConfig() !== null };
+  });
+
+  /** 测试 SMTP 连接（验证用户名密码是否正确、端口是否可达）。 */
+  app.post('/api/mail/verify', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) {
+      return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    }
+
+    const result = await verifySmtpConnection();
+    if (result.ok) {
+      return reply.send({ ok: true, message: 'SMTP 连接成功' });
+    }
+    return reply.code(200).send({ ok: false, message: result.message });
   });
 
   app.setNotFoundHandler((request, reply) => {

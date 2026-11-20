@@ -36,6 +36,8 @@ export default defineConfig({
       '@repo/feature-pdf-export',
       '@repo/feature-infographic',
       '@repo/feature-guide',
+      '@repo/feature-i18n-converter',
+      '@repo/feature-mail',
     ],
   },
 });
