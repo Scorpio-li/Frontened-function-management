@@ -10,6 +10,7 @@ import { AccountStore, DuplicateUsernameError, normalizeUsername } from './store
 import type { StoredAccount } from './store';
 import { readSmtpConfig, sendMail, verifySmtpConnection } from './mailer';
 import { DuplicateCategoryError, EffectStore, type EffectType } from './effect-store';
+import { EffectAssetStore } from './effect-assets';
 
 /** 内置管理员固定 id。 */
 const ADMIN_ID = 'admin';
@@ -98,6 +99,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   const sessions = new SessionStore(sessionTtlMs);
   const effectStore = new EffectStore(options.dataDir);
   await effectStore.init();
+  const assetStore = new EffectAssetStore(options.dataDir);
+  await assetStore.init();
 
   function resolveCurrentUser(request: FastifyRequest): CurrentUser | null {
     const sessionId = readSessionId(request);
@@ -410,6 +413,53 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   });
 
   // —— CSS 效果模块 ——
+
+  /** 图片素材列表：仅登录用户可见。 */
+  app.get('/api/css-effects/assets', async (request, reply) => {
+    const user = resolveCurrentUser(request);
+    if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+    return assetStore.list();
+  });
+
+  /** 上传图片素材（data URL），仅管理员；预览 iframe 需要较大请求体。 */
+  app.post<{ Body: unknown }>(
+    '/api/css-effects/assets',
+    { bodyLimit: 8 * 1024 * 1024 },
+    async (request, reply) => {
+      const user = resolveCurrentUser(request);
+      if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+      if (user.role !== 'admin') return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+
+      const body: unknown = request.body;
+      if (!isRecord(body) || typeof body.dataUrl !== 'string') {
+        return sendError(reply, 400, 'VALIDATION_ERROR', '请提供图片的 dataUrl');
+      }
+
+      try {
+        const asset = await assetStore.save(body.dataUrl);
+        return reply.code(201).send(asset);
+      } catch (error) {
+        if (error instanceof Error) {
+          return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
+        }
+        throw error;
+      }
+    },
+  );
+
+  /**
+   * 读取图片素材：无需登录。
+   * 效果预览运行在 sandbox iframe 中，不依赖登录 Cookie 才能稳定加载。
+   */
+  app.get<{ Params: { name: string } }>('/api/css-effects/assets/:name', async (request, reply) => {
+    const asset = await assetStore.read(request.params.name);
+    if (!asset) return sendError(reply, 404, 'NOT_FOUND', '图片不存在');
+    return reply
+      .header('Cache-Control', 'public, max-age=31536000, immutable')
+      .header('X-Content-Type-Options', 'nosniff')
+      .type(asset.contentType)
+      .send(asset.buffer);
+  });
 
   app.get('/api/css-effects/categories', async (request, reply) => {
     const user = resolveCurrentUser(request);

@@ -26,6 +26,12 @@ pnpm dev
 
 「邮件发送」功能需要额外的 SMTP 配置：在 `apps/server/.env.local` 中设置 `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`（示例见 `apps/server/.env.example`）。未配置时页面会展示引导提示，发送与测试连接按钮不可用。
 
+## CSS 效果模块
+
+- 按分类浏览 CSS / 动画 / ECharts 效果，点击卡片可查看完整源码并一键复制。
+- 管理员在新增或编辑效果时，可点击「运行代码」直接用当前 HTML / CSS / JS 生成预览（修改代码后重新运行即可）。
+- 需要图片的效果可在表单中上传素材（PNG / JPEG / GIF / WebP，单张 ≤ 5MB），上传后可一键插入到 HTML / CSS 代码；图片保存在 `apps/server/data/css-effect-assets/`，属本地数据，不入库。
+
 ## 目录结构
 
 ```text

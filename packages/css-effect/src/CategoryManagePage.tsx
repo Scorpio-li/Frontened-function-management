@@ -589,6 +589,110 @@ export const CSS_EFFECTS_PAGE_CSS = `
   color: #6b7280;
 }
 
+/* ===== 图片素材 ===== */
+.ffm-effects-assets {
+  border: 1px dashed #d1d5db;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  background: #fbfcfe;
+}
+.ffm-effects-assets__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ffm-effects-assets__hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7280;
+}
+.ffm-effects-assets__upload {
+  flex-shrink: 0;
+  border: 1px solid #d1d5db;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ffm-effects-assets__list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+.ffm-effects-assets__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+.ffm-effects-assets__thumb {
+  width: 100%;
+  height: 88px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #f9fafb;
+}
+.ffm-effects-assets__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+.ffm-effects-assets__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ffm-effects-assets__actions {
+  display: flex;
+  gap: 4px;
+}
+.ffm-effects-assets__actions .ffm-effects-btn {
+  flex: 1;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+.ffm-effects-assets__empty {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* ===== 运行预览 ===== */
+.ffm-effects-run {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 14px;
+}
+.ffm-effects-run__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+.ffm-effects-run__body { padding: 12px; }
+.ffm-effects-run__hint {
+  margin: 0;
+  padding: 24px 12px;
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+  line-height: 1.6;
+}
+
 /* ===== Toast ===== */
 .ffm-effects-toast-stack {
   position: fixed;

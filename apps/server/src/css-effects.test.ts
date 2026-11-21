@@ -306,6 +306,72 @@ describe('CSS 效果 API — 效果管理', () => {
   });
 });
 
+describe('CSS 效果 API — 图片素材', () => {
+  // 1x1 透明 PNG，用于验证上传与读取链路。
+  const PNG_DATA_URL =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  async function upload(dataUrl: string, headers: { cookie: string }) {
+    return app.inject({
+      method: 'POST',
+      url: '/api/css-effects/assets',
+      headers,
+      payload: { dataUrl },
+    });
+  }
+
+  it('未登录不能查看素材列表，viewer 不能上传', async () => {
+    const list = await app.inject({ method: 'GET', url: '/api/css-effects/assets' });
+    expect(list.statusCode).toBe(401);
+
+    const uploadByViewer = await upload(PNG_DATA_URL, viewerHeaders);
+    expect(uploadByViewer.statusCode).toBe(403);
+  });
+
+  it('管理员上传 PNG 后可通过返回地址直接读取', async () => {
+    const created = await upload(PNG_DATA_URL, adminHeaders);
+    expect(created.statusCode).toBe(201);
+    const asset = created.json<{ name: string; url: string; size: number }>();
+    expect(asset.url).toBe(`/api/css-effects/assets/${asset.name}`);
+    expect(asset.size).toBeGreaterThan(0);
+
+    const list = await app.inject({
+      method: 'GET',
+      url: '/api/css-effects/assets',
+      headers: adminHeaders,
+    });
+    expect(list.statusCode).toBe(200);
+    expect(list.json<Array<{ name: string }>>().some((item) => item.name === asset.name)).toBe(
+      true,
+    );
+
+    // 预览 iframe 不带 Cookie 也应能读取图片
+    const file = await app.inject({ method: 'GET', url: asset.url });
+    expect(file.statusCode).toBe(200);
+    expect(file.headers['content-type']).toContain('image/png');
+    expect(file.rawPayload.length).toBeGreaterThan(0);
+  });
+
+  it('非法 dataUrl 与不支持的类型返回 400', async () => {
+    const invalid = await upload('not-a-data-url', adminHeaders);
+    expect(invalid.statusCode).toBe(400);
+
+    const svg = await upload(
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=',
+      adminHeaders,
+    );
+    expect(svg.statusCode).toBe(400);
+  });
+
+  it('非法文件名（路径穿越）返回 404', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/css-effects/assets/..%2F..%2Faccount.json',
+    });
+    expect(response.statusCode).toBe(404);
+  });
+});
+
 describe('邮件接口回归', () => {
   it('/api/mail/verify 在未配置 SMTP 时返回 ok=false 而不是挂起', async () => {
     const response = await app.inject({

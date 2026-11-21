@@ -4,8 +4,18 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { CSS_EFFECTS_PAGE_CSS } from './CategoryManagePage';
 import { EffectCodeModal } from './EffectCodeModal';
 import { EffectPreview } from './EffectPreview';
-import type { Toast } from './shared';
-import { EFFECT_TYPE_LABEL, apiFetch, tagStyle, useCategories, useCurrentUser } from './shared';
+import type { EffectAsset, Toast } from './shared';
+import {
+  EFFECT_TYPE_LABEL,
+  MAX_ASSET_BYTES,
+  apiFetch,
+  fetchEffectAssets,
+  formatFileSize,
+  tagStyle,
+  uploadEffectAsset,
+  useCategories,
+  useCurrentUser,
+} from './shared';
 import type { CssEffect, EffectCategory, EffectType } from './types';
 import { UNCATEGORIZED_NAME, parseCategoryIdParam } from './types';
 
@@ -541,6 +551,108 @@ function EffectFormModal({
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // 图片素材：上传后可插入 HTML / CSS
+  const [assets, setAssets] = useState<EffectAsset[]>([]);
+  const [assetError, setAssetError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const htmlRef = useRef<HTMLTextAreaElement | null>(null);
+  const cssRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // 运行预览：点击「运行代码」生成快照，token 用于强制重新执行
+  const [runState, setRunState] = useState<{ effect: CssEffect; token: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchEffectAssets()
+      .then((list) => {
+        if (!cancelled) setAssets(list);
+      })
+      .catch(() => {
+        /* 素材列表失败不阻塞表单 */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setAssetError(null);
+    setUploading(true);
+    try {
+      const uploaded: EffectAsset[] = [];
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith('image/')) throw new Error('仅支持图片文件');
+        if (file.size > MAX_ASSET_BYTES) throw new Error('单张图片不能超过 5MB');
+        uploaded.push(await uploadEffectAsset(file));
+      }
+      setAssets((prev) => [...uploaded, ...prev]);
+    } catch (err) {
+      setAssetError(err instanceof Error ? err.message : '图片上传失败');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  /** 把片段插入到 HTML / CSS 代码框的光标位置。 */
+  function insertSnippet(target: 'html' | 'css', snippet: string) {
+    const isHtml = target === 'html';
+    const current = isHtml ? html : css;
+    const textarea = isHtml ? htmlRef.current : cssRef.current;
+    const start = textarea?.selectionStart ?? current.length;
+    const end = textarea?.selectionEnd ?? current.length;
+    const next = `${current.slice(0, start)}${snippet}${current.slice(end)}`;
+    if (isHtml) setHtml(next);
+    else setCss(next);
+
+    window.requestAnimationFrame(() => {
+      const node = isHtml ? htmlRef.current : cssRef.current;
+      if (!node) return;
+      const cursor = start + snippet.length;
+      node.focus();
+      node.setSelectionRange(cursor, cursor);
+    });
+  }
+
+  /** 用当前表单内容运行一次预览。 */
+  function handleRun() {
+    setFormError(null);
+
+    let echartsOption: unknown = undefined;
+    if (effectType === 'echarts') {
+      const trimmed = echartsRaw.trim();
+      if (!trimmed) {
+        setFormError('ECharts 效果必须填写 echartsOption（JSON）');
+        return;
+      }
+      try {
+        echartsOption = JSON.parse(trimmed) as unknown;
+      } catch {
+        setFormError('echartsOption 不是合法的 JSON');
+        return;
+      }
+    }
+
+    const now = new Date().toISOString();
+    const previewEffect: CssEffect = {
+      id: initial?.id ?? 'preview',
+      categoryId,
+      name: name.trim() || '预览效果',
+      description: description.trim() || undefined,
+      effectType,
+      tags: [],
+      html: html.trim() || undefined,
+      css: css.trim() || undefined,
+      js: js.trim() || undefined,
+      echartsOption,
+      createdAt: initial?.createdAt ?? now,
+      updatedAt: now,
+    };
+    setRunState((prev) => ({ effect: previewEffect, token: (prev?.token ?? 0) + 1 }));
+  }
+
   async function handleSubmit() {
     if (!name.trim()) {
       setFormError('效果名称不能为空');
@@ -667,10 +779,75 @@ function EffectFormModal({
           />
         </label>
 
+        <div className="ffm-effects-assets">
+          <div className="ffm-effects-assets__header">
+            <div>
+              <span className="ffm-effects-field__label">图片素材</span>
+              <p className="ffm-effects-assets__hint">
+                上传图片后会得到可直接引用的地址，点击按钮插入到 HTML / CSS 代码中；单张不超过 5MB。
+              </p>
+            </div>
+            <label className="ffm-effects-btn ffm-effects-btn--ghost ffm-effects-assets__upload">
+              {uploading ? '上传中…' : '+ 上传图片'}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                multiple
+                hidden
+                disabled={uploading}
+                onChange={(event) => void handleFiles(event.target.files)}
+              />
+            </label>
+          </div>
+
+          {assetError && <div className="ffm-effects-form-error">{assetError}</div>}
+
+          {assets.length > 0 ? (
+            <ul className="ffm-effects-assets__list">
+              {assets.map((asset) => (
+                <li key={asset.name} className="ffm-effects-assets__item">
+                  <img
+                    className="ffm-effects-assets__thumb"
+                    src={asset.url}
+                    alt={asset.name}
+                    loading="lazy"
+                  />
+                  <div className="ffm-effects-assets__meta">
+                    <span className="ffm-effects-assets__name" title={asset.name}>
+                      {asset.name}
+                    </span>
+                    <span>{formatFileSize(asset.size)}</span>
+                  </div>
+                  <div className="ffm-effects-assets__actions">
+                    <button
+                      type="button"
+                      className="ffm-effects-btn ffm-effects-btn--ghost"
+                      onClick={() => insertSnippet('html', `<img src="${asset.url}" alt="" />`)}
+                    >
+                      插入 HTML
+                    </button>
+                    <button
+                      type="button"
+                      className="ffm-effects-btn ffm-effects-btn--ghost"
+                      onClick={() => insertSnippet('css', `background-image: url("${asset.url}");`)}
+                    >
+                      插入 CSS
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="ffm-effects-assets__empty">暂无图片素材，上传后可复用到任意效果。</p>
+          )}
+        </div>
+
         <div className="ffm-effects-form-grid">
           <label className="ffm-effects-field">
             <span className="ffm-effects-field__label">HTML</span>
             <textarea
+              ref={htmlRef}
               className="ffm-effects-input ffm-effects-input--code"
               value={html}
               onChange={(event) => setHtml(event.target.value)}
@@ -681,6 +858,7 @@ function EffectFormModal({
           <label className="ffm-effects-field">
             <span className="ffm-effects-field__label">CSS</span>
             <textarea
+              ref={cssRef}
               className="ffm-effects-input ffm-effects-input--code"
               value={css}
               onChange={(event) => setCss(event.target.value)}
@@ -713,6 +891,29 @@ function EffectFormModal({
             />
           </label>
         )}
+
+        <div className="ffm-effects-run">
+          <div className="ffm-effects-run__header">
+            <h4 className="ffm-effects-code-header__title">运行预览</h4>
+            <button
+              type="button"
+              className="ffm-effects-btn ffm-effects-btn--primary"
+              onClick={handleRun}
+            >
+              ▶ 运行代码
+            </button>
+          </div>
+          <div className="ffm-effects-run__body">
+            {runState ? (
+              <EffectPreview key={runState.token} effect={runState.effect} mode="full" />
+            ) : (
+              <p className="ffm-effects-run__hint">
+                填写 HTML / CSS /
+                JS（或上传图片素材）后，点击「运行代码」查看实际效果；修改代码后需重新运行。
+              </p>
+            )}
+          </div>
+        </div>
 
         {formError && <div className="ffm-effects-form-error">{formError}</div>}
       </div>

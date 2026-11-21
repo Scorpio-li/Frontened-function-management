@@ -141,6 +141,51 @@ export function useCategoryNavItems(): CategoryNavItem[] {
 }
 
 // ---------------------------------------------------------------------------
+// 图片素材
+// ---------------------------------------------------------------------------
+
+/** 效果图片素材。url 可直接用于 HTML / CSS。 */
+export interface EffectAsset {
+  name: string;
+  url: string;
+  size: number;
+  createdAt: string;
+}
+
+/** 单张图片素材大小上限，与后端保持一致。 */
+export const MAX_ASSET_BYTES = 5 * 1024 * 1024;
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+/** 拉取已上传的图片素材列表（按上传时间倒序）。 */
+export async function fetchEffectAssets(): Promise<EffectAsset[]> {
+  const data = await apiFetch<EffectAsset[]>('/api/css-effects/assets');
+  return Array.isArray(data) ? data : [];
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(new Error('读取图片失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** 上传图片素材，返回可直接写进代码的素材信息。 */
+export async function uploadEffectAsset(file: File): Promise<EffectAsset> {
+  const dataUrl = await readFileAsDataUrl(file);
+  return apiFetch<EffectAsset>('/api/css-effects/assets', {
+    method: 'POST',
+    body: JSON.stringify({ dataUrl }),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Tag 颜色生成（基于字符串 hash，稳定且彩色）
 // ---------------------------------------------------------------------------
 
