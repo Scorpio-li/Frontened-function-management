@@ -29,8 +29,8 @@ pnpm dev
 ## CSS 效果模块
 
 - 按分类浏览 CSS / 动画 / ECharts 效果，点击卡片可查看完整源码并一键复制。
-- 管理员在新增或编辑效果时，可点击「运行代码」直接用当前 HTML / CSS / JS 生成预览（修改代码后重新运行即可）。
-- 需要图片的效果可在表单中上传素材（PNG / JPEG / GIF / WebP，单张 ≤ 5MB），上传后可一键插入到 HTML / CSS 代码；图片保存在 `apps/server/data/css-effect-assets/`，属本地数据，不入库。
+- 管理员在新增或编辑效果时，可点击「运行代码」直接用当前 HTML / CSS / JS 生成预览（修改代码后重新运行即可）；可填写 CDN 链接（每行一个，`.css` 或 `<link>` 作为样式引入，其余作为脚本引入）。
+- 需要图片的效果可在表单中上传素材（PNG / JPEG / GIF / WebP，单张 ≤ 5MB），素材只属于当前效果，可重命名、删除，并可一键插入到 HTML / CSS 代码；图片与索引保存在 `apps/server/data/css-effect-assets/`，属本地数据，不入库。
 
 ## 目录结构
 

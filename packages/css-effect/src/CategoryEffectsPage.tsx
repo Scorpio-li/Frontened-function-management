@@ -9,8 +9,10 @@ import {
   EFFECT_TYPE_LABEL,
   MAX_ASSET_BYTES,
   apiFetch,
+  deleteEffectAsset,
   fetchEffectAssets,
   formatFileSize,
+  renameEffectAsset,
   tagStyle,
   uploadEffectAsset,
   useCategories,
@@ -193,179 +195,187 @@ export function CategoryEffectsPage() {
   if (categoryNotFound) {
     return (
       <div className="ffm-effects-page">
-        <button type="button" className="ffm-effects-back" onClick={() => navigate('/css-effect')}>
-          ← 分类管理
-        </button>
-        <div className="ffm-effects-empty">
-          <p className="ffm-effects-empty__title">分类不存在或已删除</p>
-          <p className="ffm-effects-empty__sub">该分类可能已被删除，请返回分类管理重新选择。</p>
-          <div style={{ marginTop: 16 }}>
-            <button
-              type="button"
-              className="ffm-effects-btn ffm-effects-btn--primary"
-              onClick={() => navigate('/css-effect')}
-            >
-              返回分类管理
-            </button>
+        <div className="ffm-effects-page__scroll">
+          <button
+            type="button"
+            className="ffm-effects-back"
+            onClick={() => navigate('/css-effect')}
+          >
+            ← 分类管理
+          </button>
+          <div className="ffm-effects-empty">
+            <p className="ffm-effects-empty__title">分类不存在或已删除</p>
+            <p className="ffm-effects-empty__sub">该分类可能已被删除，请返回分类管理重新选择。</p>
+            <div style={{ marginTop: 16 }}>
+              <button
+                type="button"
+                className="ffm-effects-btn ffm-effects-btn--primary"
+                onClick={() => navigate('/css-effect')}
+              >
+                返回分类管理
+              </button>
+            </div>
           </div>
+          <ToastStack toasts={toasts} />
         </div>
-        <ToastStack toasts={toasts} />
       </div>
     );
   }
 
   return (
     <div className="ffm-effects-page">
-      <button type="button" className="ffm-effects-back" onClick={() => navigate('/css-effect')}>
-        ← 分类管理
-      </button>
+      <div className="ffm-effects-page__scroll">
+        <button type="button" className="ffm-effects-back" onClick={() => navigate('/css-effect')}>
+          ← 分类管理
+        </button>
 
-      <header className="ffm-effects-main__header">
-        <div className="ffm-effects-main__title">
-          <h2>
-            {categoryName}
-            <span
-              className="ffm-effects-badge"
-              style={{ backgroundColor: '#f3f4f6', color: '#4b5563', marginLeft: 10 }}
-            >
-              共 {effects.length} 个效果
-            </span>
-          </h2>
-          <p>
-            {category?.description ||
-              (categoryId === null ? '未归入任何分类的效果' : '该分类下的效果资产')}
-          </p>
-        </div>
-
-        <div className="ffm-effects-main__actions">
-          <input
-            type="search"
-            className="ffm-effects-input ffm-effects-input--search"
-            placeholder="搜索效果（名称 / 描述 / 标签）…"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-          />
-          {isAdmin && (
-            <>
-              <button
-                type="button"
-                className="ffm-effects-btn ffm-effects-btn--primary"
-                onClick={() => setEffectModal({ mode: 'create' })}
+        <header className="ffm-effects-main__header">
+          <div className="ffm-effects-main__title">
+            <h2>
+              {categoryName}
+              <span
+                className="ffm-effects-badge"
+                style={{ backgroundColor: '#f3f4f6', color: '#4b5563', marginLeft: 10 }}
               >
-                + 新增效果
-              </button>
-              {selectedIds.size > 0 && (
+                共 {effects.length} 个效果
+              </span>
+            </h2>
+            <p>
+              {category?.description ||
+                (categoryId === null ? '未归入任何分类的效果' : '该分类下的效果资产')}
+            </p>
+          </div>
+
+          <div className="ffm-effects-main__actions">
+            <input
+              type="search"
+              className="ffm-effects-input ffm-effects-input--search"
+              placeholder="搜索效果（名称 / 描述 / 标签）…"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+            {isAdmin && (
+              <>
                 <button
                   type="button"
-                  className="ffm-effects-btn"
-                  onClick={() => {
-                    setBatchTarget(undefined);
-                    setBatchMoveOpen(true);
-                  }}
+                  className="ffm-effects-btn ffm-effects-btn--primary"
+                  onClick={() => setEffectModal({ mode: 'create' })}
                 >
-                  批量转移 ({selectedIds.size})
+                  + 新增效果
                 </button>
-              )}
-            </>
-          )}
-        </div>
-      </header>
+                {selectedIds.size > 0 && (
+                  <button
+                    type="button"
+                    className="ffm-effects-btn"
+                    onClick={() => {
+                      setBatchTarget(undefined);
+                      setBatchMoveOpen(true);
+                    }}
+                  >
+                    批量转移 ({selectedIds.size})
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </header>
 
-      {error && (
-        <div className="ffm-effects-error-banner" role="alert">
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="ffm-effects-error-banner" role="alert">
+            {error}
+          </div>
+        )}
 
-      {isAdmin && selectedIds.size > 0 && (
-        <div className="ffm-effects-batch-bar">
-          <span>已选 {selectedIds.size} 个效果</span>
-          <button type="button" onClick={() => setSelectedIds(new Set())}>
-            清空选择
-          </button>
-        </div>
-      )}
+        {isAdmin && selectedIds.size > 0 && (
+          <div className="ffm-effects-batch-bar">
+            <span>已选 {selectedIds.size} 个效果</span>
+            <button type="button" onClick={() => setSelectedIds(new Set())}>
+              清空选择
+            </button>
+          </div>
+        )}
 
-      {loading ? (
-        <div className="ffm-effects-empty">加载中…</div>
-      ) : effects.length === 0 ? (
-        <div className="ffm-effects-empty">
-          <p className="ffm-effects-empty__title">暂无效果</p>
-          {isAdmin ? (
-            <>
-              <button
-                type="button"
-                className="ffm-effects-btn ffm-effects-btn--primary"
-                onClick={() => setEffectModal({ mode: 'create' })}
-              >
-                去创建第一个效果
-              </button>
-              <p className="ffm-effects-empty__sub">新效果会默认归入当前分类</p>
-            </>
-          ) : (
-            <p className="ffm-effects-empty__sub">请等待管理员添加效果资产</p>
-          )}
-        </div>
-      ) : (
-        <div
-          className="ffm-effects-grid"
-          style={{
-            display: 'grid',
-            gap: 16,
-            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          }}
-        >
-          {effects.map((effect) => (
-            <EffectCard
-              key={effect.id}
-              effect={effect}
-              isAdmin={isAdmin}
-              selected={selectedIds.has(effect.id)}
-              onToggleSelect={() => toggleSelection(effect.id)}
-              onOpenCode={() => setCodeEffect(effect)}
-              onEdit={() => setEffectModal({ mode: 'edit', effect })}
-              onDelete={() => setDeleteTarget(effect)}
-            />
-          ))}
-        </div>
-      )}
+        {loading ? (
+          <div className="ffm-effects-empty">加载中…</div>
+        ) : effects.length === 0 ? (
+          <div className="ffm-effects-empty">
+            <p className="ffm-effects-empty__title">暂无效果</p>
+            {isAdmin ? (
+              <>
+                <button
+                  type="button"
+                  className="ffm-effects-btn ffm-effects-btn--primary"
+                  onClick={() => setEffectModal({ mode: 'create' })}
+                >
+                  去创建第一个效果
+                </button>
+                <p className="ffm-effects-empty__sub">新效果会默认归入当前分类</p>
+              </>
+            ) : (
+              <p className="ffm-effects-empty__sub">请等待管理员添加效果资产</p>
+            )}
+          </div>
+        ) : (
+          <div
+            className="ffm-effects-grid"
+            style={{
+              display: 'grid',
+              gap: 16,
+              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            }}
+          >
+            {effects.map((effect) => (
+              <EffectCard
+                key={effect.id}
+                effect={effect}
+                isAdmin={isAdmin}
+                selected={selectedIds.has(effect.id)}
+                onToggleSelect={() => toggleSelection(effect.id)}
+                onOpenCode={() => setCodeEffect(effect)}
+                onEdit={() => setEffectModal({ mode: 'edit', effect })}
+                onDelete={() => setDeleteTarget(effect)}
+              />
+            ))}
+          </div>
+        )}
 
-      {codeEffect && <EffectCodeModal effect={codeEffect} onClose={() => setCodeEffect(null)} />}
+        {codeEffect && <EffectCodeModal effect={codeEffect} onClose={() => setCodeEffect(null)} />}
 
-      {effectModal && (
-        <EffectFormModal
-          mode={effectModal.mode}
-          initial={effectModal.mode === 'edit' ? effectModal.effect : undefined}
-          defaultCategoryId={categoryId}
-          categories={categories}
-          onClose={() => setEffectModal(null)}
-          onSubmit={handleSaveEffect}
-        />
-      )}
+        {effectModal && (
+          <EffectFormModal
+            mode={effectModal.mode}
+            initial={effectModal.mode === 'edit' ? effectModal.effect : undefined}
+            defaultCategoryId={categoryId}
+            categories={categories}
+            onClose={() => setEffectModal(null)}
+            onSubmit={handleSaveEffect}
+          />
+        )}
 
-      {deleteTarget && (
-        <DeleteEffectModal
-          effect={deleteTarget}
-          onClose={() => setDeleteTarget(null)}
-          onConfirm={() => handleDeleteEffect(deleteTarget)}
-        />
-      )}
+        {deleteTarget && (
+          <DeleteEffectModal
+            effect={deleteTarget}
+            onClose={() => setDeleteTarget(null)}
+            onConfirm={() => handleDeleteEffect(deleteTarget)}
+          />
+        )}
 
-      {batchMoveOpen && (
-        <BatchMoveModal
-          categories={categories}
-          count={selectedIds.size}
-          target={batchTarget}
-          onTargetChange={setBatchTarget}
-          onClose={() => {
-            setBatchMoveOpen(false);
-            setBatchTarget(undefined);
-          }}
-          onConfirm={handleBatchMove}
-        />
-      )}
+        {batchMoveOpen && (
+          <BatchMoveModal
+            categories={categories}
+            count={selectedIds.size}
+            target={batchTarget}
+            onTargetChange={setBatchTarget}
+            onClose={() => {
+              setBatchMoveOpen(false);
+              setBatchTarget(undefined);
+            }}
+            onConfirm={handleBatchMove}
+          />
+        )}
 
-      <ToastStack toasts={toasts} />
+        <ToastStack toasts={toasts} />
+      </div>
     </div>
   );
 }
@@ -506,6 +516,20 @@ function EffectCard({
   );
 }
 
+/** 解析 CDN 输入（每行一个地址或 link/script 标签）；存在非法内容时返回 null。 */
+function parseCdnInput(raw: string): string[] | null {
+  const urls = raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (urls.length > 20) return null;
+  if (urls.some((url) => url.length > 512)) return null;
+  if (urls.some((url) => !/^https?:\/\//i.test(url) && !/^<(?:link|script)\b/i.test(url))) {
+    return null;
+  }
+  return urls;
+}
+
 interface EffectFormValue {
   name: string;
   categoryId: string | null;
@@ -516,6 +540,9 @@ interface EffectFormValue {
   css?: string;
   js?: string;
   echartsOption?: unknown;
+  cdnUrls: string[];
+  /** 新建效果时用于把临时上传的图片素材转移到新效果。 */
+  draftId?: string;
 }
 
 interface EffectFormModalProps {
@@ -548,13 +575,21 @@ function EffectFormModal({
   const [echartsRaw, setEchartsRaw] = useState(
     initial?.echartsOption !== undefined ? JSON.stringify(initial.echartsOption, null, 2) : '',
   );
+  const [cdnRaw, setCdnRaw] = useState((initial?.cdnUrls ?? []).join('\n'));
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // 图片素材：上传后可插入 HTML / CSS
+  // 新建效果还没有真实 id：用 draftId 归属本次上传的素材，保存成功后由后端转移
+  const [draftId] = useState(() => `draft-${crypto.randomUUID()}`);
+  const assetOwnerId = initial?.id ?? draftId;
+
+  // 图片素材：只展示当前效果下的素材，上传后可插入 HTML / CSS
   const [assets, setAssets] = useState<EffectAsset[]>([]);
   const [assetError, setAssetError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const htmlRef = useRef<HTMLTextAreaElement | null>(null);
   const cssRef = useRef<HTMLTextAreaElement | null>(null);
@@ -564,7 +599,7 @@ function EffectFormModal({
 
   useEffect(() => {
     let cancelled = false;
-    fetchEffectAssets()
+    fetchEffectAssets(assetOwnerId)
       .then((list) => {
         if (!cancelled) setAssets(list);
       })
@@ -574,25 +609,56 @@ function EffectFormModal({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [assetOwnerId]);
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     setAssetError(null);
     setUploading(true);
+    const uploaded: EffectAsset[] = [];
     try {
-      const uploaded: EffectAsset[] = [];
       for (const file of Array.from(files)) {
         if (!file.type.startsWith('image/')) throw new Error('仅支持图片文件');
         if (file.size > MAX_ASSET_BYTES) throw new Error('单张图片不能超过 5MB');
-        uploaded.push(await uploadEffectAsset(file));
+        uploaded.push(await uploadEffectAsset(file, assetOwnerId));
       }
-      setAssets((prev) => [...uploaded, ...prev]);
     } catch (err) {
       setAssetError(err instanceof Error ? err.message : '图片上传失败');
     } finally {
+      if (uploaded.length > 0) {
+        setAssets((prev) => [...uploaded, ...prev]);
+      }
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleRenameAsset(asset: EffectAsset) {
+    const trimmed = editingName.trim();
+    if (!trimmed) {
+      setAssetError('素材名称不能为空');
+      return;
+    }
+    setAssetError(null);
+    try {
+      const updated = await renameEffectAsset(asset.name, assetOwnerId, trimmed);
+      setAssets((prev) => prev.map((item) => (item.name === updated.name ? updated : item)));
+      setEditingAsset(null);
+      setEditingName('');
+    } catch (err) {
+      setAssetError(err instanceof Error ? err.message : '重命名失败');
+    }
+  }
+
+  async function handleDeleteAsset(asset: EffectAsset) {
+    setAssetError(null);
+    try {
+      await deleteEffectAsset(asset.name, assetOwnerId);
+      setAssets((prev) => prev.filter((item) => item.name !== asset.name));
+      setConfirmingDelete(null);
+    } catch (err) {
+      setAssetError(err instanceof Error ? err.message : '删除素材失败');
+      setConfirmingDelete(null);
     }
   }
 
@@ -635,6 +701,12 @@ function EffectFormModal({
       }
     }
 
+    const cdnUrls = parseCdnInput(cdnRaw);
+    if (cdnUrls === null) {
+      setFormError('CDN 配置需为 http(s) 地址或 <link>/<script> 标签，每行一条，最多 20 条');
+      return;
+    }
+
     const now = new Date().toISOString();
     const previewEffect: CssEffect = {
       id: initial?.id ?? 'preview',
@@ -647,6 +719,7 @@ function EffectFormModal({
       css: css.trim() || undefined,
       js: js.trim() || undefined,
       echartsOption,
+      cdnUrls,
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
     };
@@ -683,6 +756,12 @@ function EffectFormModal({
       .map((tag) => tag.trim())
       .filter(Boolean);
 
+    const cdnUrls = parseCdnInput(cdnRaw);
+    if (cdnUrls === null) {
+      setFormError('CDN 配置需为 http(s) 地址或 <link>/<script> 标签，每行一条，最多 20 条');
+      return;
+    }
+
     setFormError(null);
     setSubmitting(true);
     try {
@@ -696,6 +775,8 @@ function EffectFormModal({
         css: css.trim() || undefined,
         js: js.trim() || undefined,
         echartsOption,
+        cdnUrls,
+        draftId: mode === 'create' ? draftId : undefined,
       });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : '保存效果失败');
@@ -810,15 +891,31 @@ function EffectFormModal({
                   <img
                     className="ffm-effects-assets__thumb"
                     src={asset.url}
-                    alt={asset.name}
+                    alt={asset.fileName}
                     loading="lazy"
                   />
+
                   <div className="ffm-effects-assets__meta">
-                    <span className="ffm-effects-assets__name" title={asset.name}>
-                      {asset.name}
-                    </span>
+                    {editingAsset === asset.name ? (
+                      <input
+                        className="ffm-effects-input ffm-effects-assets__rename"
+                        value={editingName}
+                        maxLength={80}
+                        autoFocus
+                        onChange={(event) => setEditingName(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') void handleRenameAsset(asset);
+                          if (event.key === 'Escape') setEditingAsset(null);
+                        }}
+                      />
+                    ) : (
+                      <span className="ffm-effects-assets__name" title={asset.fileName}>
+                        {asset.fileName}
+                      </span>
+                    )}
                     <span>{formatFileSize(asset.size)}</span>
                   </div>
+
                   <div className="ffm-effects-assets__actions">
                     <button
                       type="button"
@@ -835,11 +932,75 @@ function EffectFormModal({
                       插入 CSS
                     </button>
                   </div>
+
+                  <div className="ffm-effects-assets__actions">
+                    {editingAsset === asset.name ? (
+                      <>
+                        <button
+                          type="button"
+                          className="ffm-effects-btn ffm-effects-btn--ghost"
+                          onClick={() => void handleRenameAsset(asset)}
+                        >
+                          保存名称
+                        </button>
+                        <button
+                          type="button"
+                          className="ffm-effects-btn ffm-effects-btn--ghost"
+                          onClick={() => setEditingAsset(null)}
+                        >
+                          取消
+                        </button>
+                      </>
+                    ) : confirmingDelete === asset.name ? (
+                      <>
+                        <button
+                          type="button"
+                          className="ffm-effects-btn ffm-effects-btn--ghost ffm-effects-assets__danger"
+                          onClick={() => void handleDeleteAsset(asset)}
+                        >
+                          确认删除
+                        </button>
+                        <button
+                          type="button"
+                          className="ffm-effects-btn ffm-effects-btn--ghost"
+                          onClick={() => setConfirmingDelete(null)}
+                        >
+                          取消
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="ffm-effects-btn ffm-effects-btn--ghost"
+                          onClick={() => {
+                            setEditingAsset(asset.name);
+                            setEditingName(asset.fileName);
+                            setConfirmingDelete(null);
+                          }}
+                        >
+                          重命名
+                        </button>
+                        <button
+                          type="button"
+                          className="ffm-effects-btn ffm-effects-btn--ghost ffm-effects-assets__danger"
+                          onClick={() => {
+                            setConfirmingDelete(asset.name);
+                            setEditingAsset(null);
+                          }}
+                        >
+                          删除
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="ffm-effects-assets__empty">暂无图片素材，上传后可复用到任意效果。</p>
+            <p className="ffm-effects-assets__empty">
+              当前效果暂无图片素材，上传后仅在本效果中可见。
+            </p>
           )}
         </div>
 
@@ -876,6 +1037,21 @@ function EffectFormModal({
             onChange={(event) => setJs(event.target.value)}
             rows={6}
             placeholder="// 例如：const chart = echarts.init(document.getElementById('echarts-container'))"
+          />
+        </label>
+
+        <label className="ffm-effects-field">
+          <span className="ffm-effects-field__label">
+            CDN 链接（每行一个；.css 或 &lt;link&gt; 作为样式，其余作为脚本）
+          </span>
+          <textarea
+            className="ffm-effects-input ffm-effects-input--code"
+            value={cdnRaw}
+            onChange={(event) => setCdnRaw(event.target.value)}
+            rows={3}
+            placeholder={
+              'https://cdn.jsdelivr.net/npm/animejs/lib/anime.min.js\n<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC&display=swap" />'
+            }
           />
         </label>
 
@@ -1130,5 +1306,7 @@ function buildEffectBody(data: EffectFormValue): Record<string, unknown> {
   if (data.css !== undefined) body.css = data.css;
   if (data.js !== undefined) body.js = data.js;
   if (data.echartsOption !== undefined) body.echartsOption = data.echartsOption;
+  body.cdnUrls = data.cdnUrls;
+  if (data.draftId) body.draftId = data.draftId;
   return body;
 }

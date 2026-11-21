@@ -7,6 +7,31 @@ interface EffectPreviewProps {
   mode?: 'thumb' | 'full';
 }
 
+/** 转义 HTML 属性值，避免 CDN 地址里的引号破坏结构。 */
+function escapeAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function isStylesheetUrl(url: string): boolean {
+  return /\.css(?:[?#].*)?$/i.test(url);
+}
+
+/** 把一条 CDN 配置转成样式标签；支持直接粘贴 <link> 标签。 */
+function toStyleTag(entry: string): string {
+  if (/^<link\b/i.test(entry)) return entry;
+  return `<link rel="stylesheet" href="${escapeAttr(entry)}" />`;
+}
+
+/** 把一条 CDN 配置转成脚本标签；支持直接粘贴 <script> 标签。 */
+function toScriptTag(entry: string): string {
+  if (/^<script\b/i.test(entry)) return entry;
+  return `<script src="${escapeAttr(entry)}"></script>`;
+}
+
 /**
  * 将效果代码组装成一段可直接塞进 iframe srcdoc 的 HTML 字符串。
  * thumb 模式只渲染静态 html + css，不执行任何脚本。
@@ -17,6 +42,19 @@ function buildSrcdoc(effect: CssEffect, mode: 'thumb' | 'full'): string {
 
   const isFull = mode === 'full';
   const needsEcharts = effectType === 'echarts';
+
+  const cdnUrls = Array.isArray(effect.cdnUrls) ? effect.cdnUrls : [];
+  // .css 链接或 <link> 标签作为样式引入；其余作为脚本，缩略图模式不加载脚本
+  const cdnStyles = cdnUrls
+    .filter((entry) => /^<link\b/i.test(entry) || isStylesheetUrl(entry))
+    .map(toStyleTag)
+    .join('\n');
+  const cdnScripts = isFull
+    ? cdnUrls
+        .filter((entry) => !/^<link\b/i.test(entry) && !isStylesheetUrl(entry))
+        .map(toScriptTag)
+        .join('\n')
+    : '';
 
   const styles = `
     <style>
@@ -96,7 +134,7 @@ function buildSrcdoc(effect: CssEffect, mode: 'thumb' | 'full'): string {
     `);
   }
 
-  return `<!doctype html><html><head><meta charset="utf-8" />${styles}</head><body>${html}${echartsContainer}${scripts.join('')}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8" />${cdnStyles}${styles}</head><body>${html}${echartsContainer}${cdnScripts}${scripts.join('')}</body></html>`;
 }
 
 export function EffectPreview({ effect, mode = 'thumb' }: EffectPreviewProps) {

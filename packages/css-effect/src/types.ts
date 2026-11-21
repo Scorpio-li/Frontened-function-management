@@ -19,6 +19,8 @@ export interface CssEffect {
   css?: string;
   js?: string;
   echartsOption?: unknown;
+  /** 预览时注入的 CDN 链接（.css 作为样式，其余作为脚本）。 */
+  cdnUrls?: string[];
   createdAt: string;
   updatedAt: string;
 }

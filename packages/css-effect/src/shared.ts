@@ -147,9 +147,13 @@ export function useCategoryNavItems(): CategoryNavItem[] {
 /** 效果图片素材。url 可直接用于 HTML / CSS。 */
 export interface EffectAsset {
   name: string;
+  /** 上传时的原始文件名，用于展示与重命名。 */
+  fileName: string;
   url: string;
   size: number;
   createdAt: string;
+  /** 归属的效果 id（新建时为 draft-xxx）。 */
+  effectId: string;
 }
 
 /** 单张图片素材大小上限，与后端保持一致。 */
@@ -161,9 +165,10 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
-/** 拉取已上传的图片素材列表（按上传时间倒序）。 */
-export async function fetchEffectAssets(): Promise<EffectAsset[]> {
-  const data = await apiFetch<EffectAsset[]>('/api/css-effects/assets');
+/** 拉取某个效果下的图片素材（按上传时间倒序）。 */
+export async function fetchEffectAssets(effectId: string): Promise<EffectAsset[]> {
+  const params = new URLSearchParams({ effectId });
+  const data = await apiFetch<EffectAsset[]>(`/api/css-effects/assets?${params.toString()}`);
   return Array.isArray(data) ? data : [];
 }
 
@@ -176,12 +181,32 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-/** 上传图片素材，返回可直接写进代码的素材信息。 */
-export async function uploadEffectAsset(file: File): Promise<EffectAsset> {
+/** 上传图片素材到指定效果，返回可直接写进代码的素材信息。 */
+export async function uploadEffectAsset(file: File, effectId: string): Promise<EffectAsset> {
   const dataUrl = await readFileAsDataUrl(file);
   return apiFetch<EffectAsset>('/api/css-effects/assets', {
     method: 'POST',
-    body: JSON.stringify({ dataUrl }),
+    body: JSON.stringify({ dataUrl, effectId, fileName: file.name }),
+  });
+}
+
+/** 重命名素材展示名。 */
+export async function renameEffectAsset(
+  name: string,
+  effectId: string,
+  fileName: string,
+): Promise<EffectAsset> {
+  return apiFetch<EffectAsset>(`/api/css-effects/assets/${name}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ effectId, fileName }),
+  });
+}
+
+/** 删除素材。 */
+export async function deleteEffectAsset(name: string, effectId: string): Promise<void> {
+  const params = new URLSearchParams({ effectId });
+  await apiFetch(`/api/css-effects/assets/${name}?${params.toString()}`, {
+    method: 'DELETE',
   });
 }
 

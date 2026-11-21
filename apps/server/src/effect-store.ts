@@ -26,6 +26,8 @@ export interface CssEffect {
   css?: string;
   js?: string;
   echartsOption?: unknown;
+  /** 预览时注入的 CDN 链接（.css 作为样式，其余作为脚本）。 */
+  cdnUrls?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -441,6 +443,7 @@ export class EffectStore {
     css?: string;
     js?: string;
     echartsOption?: unknown;
+    cdnUrls?: string[];
   }): Promise<CssEffect> {
     if (!isValidEffectName(input.name)) throw new Error('效果名称需 1–64 字符');
     if (input.categoryId && !this.categories.some((c) => c.id === input.categoryId)) {
@@ -459,6 +462,7 @@ export class EffectStore {
         css: input.css,
         js: input.js,
         echartsOption: input.echartsOption,
+        cdnUrls: input.cdnUrls && input.cdnUrls.length > 0 ? input.cdnUrls : undefined,
         createdAt: now,
         updatedAt: now,
       };
@@ -506,6 +510,12 @@ export class EffectStore {
         js: changes.js !== undefined ? changes.js : current.js,
         echartsOption:
           changes.echartsOption !== undefined ? changes.echartsOption : current.echartsOption,
+        cdnUrls:
+          changes.cdnUrls !== undefined
+            ? changes.cdnUrls.length > 0
+              ? changes.cdnUrls
+              : undefined
+            : current.cdnUrls,
         updatedAt: new Date().toISOString(),
       };
       this.effects = this.effects.map((e, i) => (i === idx ? updated : e));

@@ -38,6 +38,24 @@ function safeEqualStrings(left: string, right: string): boolean {
   return timingSafeEqual(leftDigest, rightDigest);
 }
 
+const MAX_CDN_URLS = 20;
+
+/** 单条 CDN 配置：http(s) 地址，或直接粘贴 <link> / <script> 标签。 */
+function isCdnEntry(value: string): boolean {
+  if (value.length > 512) return false;
+  return /^https?:\/\//i.test(value) || /^<(?:link|script)\b/i.test(value);
+}
+
+/** 校验效果 CDN 链接，最多 20 条；非法时返回 null。 */
+function readCdnUrls(value: unknown): string[] | null {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) return null;
+  const urls = value.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean);
+  if (urls.length > MAX_CDN_URLS) return null;
+  if (urls.some((url) => !isCdnEntry(url))) return null;
+  return urls;
+}
+
 function toPublicAccount(stored: StoredAccount): Account {
   return {
     id: stored.id,
@@ -414,12 +432,28 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   // —— CSS 效果模块 ——
 
-  /** 图片素材列表：仅登录用户可见。 */
-  app.get('/api/css-effects/assets', async (request, reply) => {
-    const user = resolveCurrentUser(request);
-    if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
-    return assetStore.list();
-  });
+  /** 某个效果下的图片素材列表：仅登录用户可见。 */
+  app.get<{ Querystring: { effectId?: string } }>(
+    '/api/css-effects/assets',
+    async (request, reply) => {
+      const user = resolveCurrentUser(request);
+      if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+
+      const effectId =
+        typeof request.query.effectId === 'string' ? request.query.effectId.trim() : '';
+      if (!effectId) {
+        return sendError(reply, 400, 'VALIDATION_ERROR', '请提供 effectId');
+      }
+      try {
+        return await assetStore.list(effectId);
+      } catch (error) {
+        if (error instanceof Error) {
+          return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
+        }
+        throw error;
+      }
+    },
+  );
 
   /** 上传图片素材（data URL），仅管理员；预览 iframe 需要较大请求体。 */
   app.post<{ Body: unknown }>(
@@ -434,10 +468,71 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       if (!isRecord(body) || typeof body.dataUrl !== 'string') {
         return sendError(reply, 400, 'VALIDATION_ERROR', '请提供图片的 dataUrl');
       }
+      const effectId = typeof body.effectId === 'string' ? body.effectId.trim() : '';
+      if (!effectId) {
+        return sendError(reply, 400, 'VALIDATION_ERROR', '请提供 effectId');
+      }
 
       try {
-        const asset = await assetStore.save(body.dataUrl);
+        const asset = await assetStore.save({
+          effectId,
+          dataUrl: body.dataUrl,
+          fileName: typeof body.fileName === 'string' ? body.fileName : undefined,
+        });
         return reply.code(201).send(asset);
+      } catch (error) {
+        if (error instanceof Error) {
+          return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
+        }
+        throw error;
+      }
+    },
+  );
+
+  /** 重命名素材展示名，仅管理员。 */
+  app.patch<{ Params: { name: string }; Body: unknown }>(
+    '/api/css-effects/assets/:name',
+    async (request, reply) => {
+      const user = resolveCurrentUser(request);
+      if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+      if (user.role !== 'admin') return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+
+      const body: unknown = request.body;
+      if (!isRecord(body)) return sendError(reply, 400, 'VALIDATION_ERROR', '请求参数格式不正确');
+      const effectId = typeof body.effectId === 'string' ? body.effectId.trim() : '';
+      const fileName = typeof body.fileName === 'string' ? body.fileName.trim() : '';
+      if (!effectId) return sendError(reply, 400, 'VALIDATION_ERROR', '请提供 effectId');
+      if (!fileName) return sendError(reply, 400, 'VALIDATION_ERROR', '素材名称不能为空');
+
+      try {
+        const updated = await assetStore.rename(request.params.name, effectId, fileName);
+        if (!updated) return sendError(reply, 404, 'NOT_FOUND', '素材不存在');
+        return reply.send(updated);
+      } catch (error) {
+        if (error instanceof Error) {
+          return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
+        }
+        throw error;
+      }
+    },
+  );
+
+  /** 删除素材，仅管理员。 */
+  app.delete<{ Params: { name: string }; Querystring: { effectId?: string } }>(
+    '/api/css-effects/assets/:name',
+    async (request, reply) => {
+      const user = resolveCurrentUser(request);
+      if (!user) return sendError(reply, 401, 'UNAUTHORIZED', UNAUTHORIZED_MESSAGE);
+      if (user.role !== 'admin') return sendError(reply, 403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+
+      const effectId =
+        typeof request.query.effectId === 'string' ? request.query.effectId.trim() : '';
+      if (!effectId) return sendError(reply, 400, 'VALIDATION_ERROR', '请提供 effectId');
+
+      try {
+        const removed = await assetStore.remove(request.params.name, effectId);
+        if (!removed) return sendError(reply, 404, 'NOT_FOUND', '素材不存在');
+        return reply.code(204).send();
       } catch (error) {
         if (error instanceof Error) {
           return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
@@ -586,6 +681,9 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     const css = typeof body.css === 'string' ? body.css : undefined;
     const js = typeof body.js === 'string' ? body.js : undefined;
     const echartsOption = body.echartsOption;
+    const cdnUrls = readCdnUrls(body.cdnUrls);
+    // 新建效果时前端用 draftId 归属临时上传的素材，创建成功后转移到真实效果 id
+    const draftId = typeof body.draftId === 'string' ? body.draftId.trim() : '';
 
     if (!name) return sendError(reply, 400, 'VALIDATION_ERROR', '效果名称不能为空');
     if (effectType !== 'css' && effectType !== 'animation' && effectType !== 'echarts') {
@@ -594,6 +692,14 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
         400,
         'VALIDATION_ERROR',
         'effectType 必须是 css / animation / echarts',
+      );
+    }
+    if (cdnUrls === null) {
+      return sendError(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'cdnUrls 必须是 http(s) 地址或 <link>/<script> 标签，最多 20 条',
       );
     }
 
@@ -608,7 +714,11 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
         css,
         js,
         echartsOption,
+        cdnUrls,
       });
+      if (draftId) {
+        await assetStore.reassign(draftId, created.id);
+      }
       return reply.code(201).send(created);
     } catch (error) {
       if (error instanceof Error) return sendError(reply, 400, 'VALIDATION_ERROR', error.message);
@@ -655,6 +765,18 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     if ('css' in body) changes.css = body.css;
     if ('js' in body) changes.js = body.js;
     if ('echartsOption' in body) changes.echartsOption = body.echartsOption;
+    if ('cdnUrls' in body) {
+      const cdnUrls = readCdnUrls(body.cdnUrls);
+      if (cdnUrls === null) {
+        return sendError(
+          reply,
+          400,
+          'VALIDATION_ERROR',
+          'cdnUrls 必须是 http(s) 地址或 <link>/<script> 标签，最多 20 条',
+        );
+      }
+      changes.cdnUrls = cdnUrls;
+    }
 
     if (Object.keys(changes).length === 0) {
       return sendError(reply, 400, 'VALIDATION_ERROR', '请至少提供一个字段');
@@ -677,6 +799,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
     const removed = await effectStore.deleteEffect(request.params.id);
     if (!removed) return sendError(reply, 404, 'NOT_FOUND', '效果不存在');
+    // 效果删除后同步清理其图片素材，避免留下孤儿文件
+    await assetStore.removeByEffect(request.params.id);
     return reply.code(204).send();
   });
 

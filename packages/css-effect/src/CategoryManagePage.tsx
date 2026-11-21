@@ -21,13 +21,29 @@ import {
 export const CSS_EFFECTS_PAGE_CSS = `
 /* ===== 页面骨架 ===== */
 .ffm-effects-page {
-  min-height: 100%;
-  padding: 20px 24px 48px;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   box-sizing: border-box;
   background: #fafbfc;
   color: #1f2937;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, "Noto Sans SC", sans-serif;
+}
+/* 页面内容在视窗内滚动，避免整页滚动后出现大块空白 */
+.ffm-effects-page__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+  box-sizing: border-box;
+}
+@media (max-width: 860px) {
+  .ffm-effects-page { height: auto; overflow: visible; }
+  .ffm-effects-page__scroll { flex: none; overflow: visible; }
+  .ffm-effects-main__actions { flex-wrap: wrap; }
 }
 .ffm-effects-main__header {
   display: flex;
@@ -52,7 +68,7 @@ export const CSS_EFFECTS_PAGE_CSS = `
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 /* ===== 返回链接 ===== */
@@ -148,7 +164,12 @@ export const CSS_EFFECTS_PAGE_CSS = `
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
-.ffm-effects-input--search { min-width: 240px; }
+.ffm-effects-input--search {
+  width: 240px;
+  min-width: 160px;
+  max-width: 360px;
+  flex: 1 1 220px;
+}
 .ffm-effects-input--code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
@@ -654,13 +675,20 @@ export const CSS_EFFECTS_PAGE_CSS = `
 }
 .ffm-effects-assets__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 .ffm-effects-assets__actions .ffm-effects-btn {
-  flex: 1;
+  flex: 1 1 72px;
   padding: 3px 8px;
   font-size: 12px;
 }
+.ffm-effects-assets__rename {
+  padding: 3px 6px;
+  font-size: 11px;
+}
+.ffm-effects-assets__danger { color: #dc2626; }
+.ffm-effects-assets__danger:hover:not(:disabled) { background: #fef2f2; }
 .ffm-effects-assets__empty {
   margin: 12px 0 0;
   font-size: 12px;
@@ -799,102 +827,104 @@ export function CategoryManagePage() {
 
   return (
     <div className="ffm-effects-page">
-      <header className="ffm-effects-main__header">
-        <div className="ffm-effects-main__title">
-          <h2>分类管理</h2>
-          <p>按分类组织 CSS 效果资产，点击分类卡片进入该分类的效果列表。</p>
-        </div>
-        {isAdmin && (
-          <div className="ffm-effects-main__actions">
-            <button
-              type="button"
-              className="ffm-effects-btn ffm-effects-btn--primary"
-              onClick={() => setModal({ mode: 'create' })}
-            >
-              + 新增分类
-            </button>
+      <div className="ffm-effects-page__scroll">
+        <header className="ffm-effects-main__header">
+          <div className="ffm-effects-main__title">
+            <h2>分类管理</h2>
+            <p>按分类组织 CSS 效果资产，点击分类卡片进入该分类的效果列表。</p>
           </div>
-        )}
-      </header>
-
-      {loading ? (
-        <div className="ffm-effects-empty">加载中…</div>
-      ) : (
-        <div className="ffm-effects-cat-grid">
-          <CategoryCard
-            name={UNCATEGORIZED_NAME}
-            description="未归入任何分类的效果"
-            fixed
-            onOpen={() => openCategory(null)}
-          />
-
-          {categories.map((category) => (
-            <CategoryCard
-              key={category.id}
-              name={category.name}
-              description={category.description || '暂无描述'}
-              createdAt={category.createdAt}
-              isAdmin={isAdmin}
-              onOpen={() => openCategory(category.id)}
-              onEdit={() => setModal({ mode: 'edit', category })}
-              onDelete={() => setModal({ mode: 'delete', category })}
-            />
-          ))}
-        </div>
-      )}
-
-      {isEmpty && (
-        <div className="ffm-effects-empty">
-          <p className="ffm-effects-empty__title">
-            {isAdmin ? '还没有分类，先创建一个' : '暂无分类'}
-          </p>
-          {isAdmin ? (
-            <>
+          {isAdmin && (
+            <div className="ffm-effects-main__actions">
               <button
                 type="button"
                 className="ffm-effects-btn ffm-effects-btn--primary"
                 onClick={() => setModal({ mode: 'create' })}
               >
-                去创建第一个分类
+                + 新增分类
               </button>
-              <p className="ffm-effects-empty__sub">也可以先进入「未分类」查看已有素材</p>
-            </>
-          ) : (
-            <p className="ffm-effects-empty__sub">请等待管理员创建分类</p>
+            </div>
           )}
-        </div>
-      )}
+        </header>
 
-      {modal && modal.mode !== 'delete' && (
-        <CategoryFormModal
-          mode={modal.mode}
-          initialName={modal.mode === 'edit' ? modal.category.name : ''}
-          initialDescription={modal.mode === 'edit' ? (modal.category.description ?? '') : ''}
-          currentId={modal.mode === 'edit' ? modal.category.id : undefined}
-          categories={categories}
-          onClose={() => setModal(null)}
-          onSubmit={handleSaveCategory}
-        />
-      )}
+        {loading ? (
+          <div className="ffm-effects-empty">加载中…</div>
+        ) : (
+          <div className="ffm-effects-cat-grid">
+            <CategoryCard
+              name={UNCATEGORIZED_NAME}
+              description="未归入任何分类的效果"
+              fixed
+              onOpen={() => openCategory(null)}
+            />
 
-      {modal && modal.mode === 'delete' && (
-        <DeleteCategoryModal
-          category={modal.category}
-          onClose={() => setModal(null)}
-          onConfirm={() => handleDeleteCategory(modal.category)}
-        />
-      )}
-
-      <div className="ffm-effects-toast-stack">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`ffm-effects-toast ffm-effects-toast--${toast.kind}`}
-            role="status"
-          >
-            {toast.message}
+            {categories.map((category) => (
+              <CategoryCard
+                key={category.id}
+                name={category.name}
+                description={category.description || '暂无描述'}
+                createdAt={category.createdAt}
+                isAdmin={isAdmin}
+                onOpen={() => openCategory(category.id)}
+                onEdit={() => setModal({ mode: 'edit', category })}
+                onDelete={() => setModal({ mode: 'delete', category })}
+              />
+            ))}
           </div>
-        ))}
+        )}
+
+        {isEmpty && (
+          <div className="ffm-effects-empty">
+            <p className="ffm-effects-empty__title">
+              {isAdmin ? '还没有分类，先创建一个' : '暂无分类'}
+            </p>
+            {isAdmin ? (
+              <>
+                <button
+                  type="button"
+                  className="ffm-effects-btn ffm-effects-btn--primary"
+                  onClick={() => setModal({ mode: 'create' })}
+                >
+                  去创建第一个分类
+                </button>
+                <p className="ffm-effects-empty__sub">也可以先进入「未分类」查看已有素材</p>
+              </>
+            ) : (
+              <p className="ffm-effects-empty__sub">请等待管理员创建分类</p>
+            )}
+          </div>
+        )}
+
+        {modal && modal.mode !== 'delete' && (
+          <CategoryFormModal
+            mode={modal.mode}
+            initialName={modal.mode === 'edit' ? modal.category.name : ''}
+            initialDescription={modal.mode === 'edit' ? (modal.category.description ?? '') : ''}
+            currentId={modal.mode === 'edit' ? modal.category.id : undefined}
+            categories={categories}
+            onClose={() => setModal(null)}
+            onSubmit={handleSaveCategory}
+          />
+        )}
+
+        {modal && modal.mode === 'delete' && (
+          <DeleteCategoryModal
+            category={modal.category}
+            onClose={() => setModal(null)}
+            onConfirm={() => handleDeleteCategory(modal.category)}
+          />
+        )}
+
+        <div className="ffm-effects-toast-stack">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`ffm-effects-toast ffm-effects-toast--${toast.kind}`}
+              role="status"
+            >
+              {toast.message}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

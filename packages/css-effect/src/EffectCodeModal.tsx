@@ -80,6 +80,9 @@ export function EffectCodeModal({ effect, onClose }: EffectCodeModalProps) {
     if (effect.html) list.push({ key: 'html', label: 'HTML', body: effect.html });
     if (effect.css) list.push({ key: 'css', label: 'CSS', body: effect.css });
     if (effect.js) list.push({ key: 'js', label: 'JS', body: effect.js });
+    if (effect.cdnUrls && effect.cdnUrls.length > 0) {
+      list.push({ key: 'cdn', label: 'CDN', body: effect.cdnUrls.join('\n') });
+    }
     if (
       effect.effectType === 'echarts' &&
       effect.echartsOption !== undefined &&
@@ -111,6 +114,9 @@ export function EffectCodeModal({ effect, onClose }: EffectCodeModalProps) {
     if (effect.html) parts.push(`/* ---- HTML ---- */\n${effect.html}`);
     if (effect.css) parts.push(`/* ---- CSS ---- */\n${effect.css}`);
     if (effect.js) parts.push(`/* ---- JS ---- */\n${effect.js}`);
+    if (effect.cdnUrls && effect.cdnUrls.length > 0) {
+      parts.push(`/* ---- CDN ---- */\n${effect.cdnUrls.join('\n')}`);
+    }
     if (
       effect.effectType === 'echarts' &&
       effect.echartsOption !== undefined &&

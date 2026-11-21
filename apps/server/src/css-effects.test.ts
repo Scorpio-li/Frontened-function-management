@@ -289,6 +289,45 @@ describe('CSS 效果 API — 效果管理', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('创建与更新效果时支持 CDN 链接，非法链接返回 400', async () => {
+    const cdnUrls = [
+      'https://cdn.jsdelivr.net/npm/animejs/lib/anime.min.js',
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC" />',
+    ];
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/css-effects/effects',
+      headers: adminHeaders,
+      payload: {
+        name: 'CDN 效果',
+        effectType: 'css',
+        cdnUrls,
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const effect = created.json<CssEffect>();
+    expect(effect.cdnUrls).toEqual(cdnUrls);
+
+    const updated = await app.inject({
+      method: 'PATCH',
+      url: `/api/css-effects/effects/${effect.id}`,
+      headers: adminHeaders,
+      payload: { cdnUrls: ['https://cdn.jsdelivr.net/npm/normalize.css/normalize.css'] },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json<CssEffect>().cdnUrls).toEqual([
+      'https://cdn.jsdelivr.net/npm/normalize.css/normalize.css',
+    ]);
+
+    const invalid = await app.inject({
+      method: 'POST',
+      url: '/api/css-effects/effects',
+      headers: adminHeaders,
+      payload: { name: '非法 CDN', effectType: 'css', cdnUrls: ['javascript:alert(1)'] },
+    });
+    expect(invalid.statusCode).toBe(400);
+  });
+
   it('删除单个效果后不可再查询到', async () => {
     const removed = await app.inject({
       method: 'DELETE',
@@ -310,39 +349,66 @@ describe('CSS 效果 API — 图片素材', () => {
   // 1x1 透明 PNG，用于验证上传与读取链路。
   const PNG_DATA_URL =
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const EFFECT_ID = 'eff-breathing';
 
-  async function upload(dataUrl: string, headers: { cookie: string }) {
+  async function upload(
+    dataUrl: string,
+    headers: { cookie: string },
+    effectId = EFFECT_ID,
+  ): Promise<InjectResponse> {
     return app.inject({
       method: 'POST',
       url: '/api/css-effects/assets',
       headers,
-      payload: { dataUrl },
+      payload: { dataUrl, effectId, fileName: 'demo.png' },
+    });
+  }
+
+  async function listAssets(effectId: string, headers: { cookie: string }) {
+    return app.inject({
+      method: 'GET',
+      url: `/api/css-effects/assets?effectId=${encodeURIComponent(effectId)}`,
+      headers,
     });
   }
 
   it('未登录不能查看素材列表，viewer 不能上传', async () => {
-    const list = await app.inject({ method: 'GET', url: '/api/css-effects/assets' });
+    const list = await app.inject({
+      method: 'GET',
+      url: `/api/css-effects/assets?effectId=${EFFECT_ID}`,
+    });
     expect(list.statusCode).toBe(401);
+
+    const missingEffectId = await app.inject({
+      method: 'GET',
+      url: '/api/css-effects/assets',
+      headers: viewerHeaders,
+    });
+    expect(missingEffectId.statusCode).toBe(400);
 
     const uploadByViewer = await upload(PNG_DATA_URL, viewerHeaders);
     expect(uploadByViewer.statusCode).toBe(403);
   });
 
-  it('管理员上传 PNG 后可通过返回地址直接读取', async () => {
+  it('管理员上传 PNG 后只能在自己的效果下看到，并可通过地址读取', async () => {
     const created = await upload(PNG_DATA_URL, adminHeaders);
     expect(created.statusCode).toBe(201);
-    const asset = created.json<{ name: string; url: string; size: number }>();
+    const asset = created.json<{ name: string; url: string; size: number; fileName: string }>();
     expect(asset.url).toBe(`/api/css-effects/assets/${asset.name}`);
+    expect(asset.fileName).toBe('demo.png');
     expect(asset.size).toBeGreaterThan(0);
 
-    const list = await app.inject({
-      method: 'GET',
-      url: '/api/css-effects/assets',
-      headers: adminHeaders,
-    });
-    expect(list.statusCode).toBe(200);
-    expect(list.json<Array<{ name: string }>>().some((item) => item.name === asset.name)).toBe(
+    const ownList = await listAssets(EFFECT_ID, adminHeaders);
+    expect(ownList.statusCode).toBe(200);
+    expect(ownList.json<Array<{ name: string }>>().some((item) => item.name === asset.name)).toBe(
       true,
+    );
+
+    // 其他效果的素材列表不应包含本次上传的图片
+    const otherList = await listAssets('eff-spinner', adminHeaders);
+    expect(otherList.statusCode).toBe(200);
+    expect(otherList.json<Array<{ name: string }>>().some((item) => item.name === asset.name)).toBe(
+      false,
     );
 
     // 预览 iframe 不带 Cookie 也应能读取图片
@@ -350,6 +416,77 @@ describe('CSS 效果 API — 图片素材', () => {
     expect(file.statusCode).toBe(200);
     expect(file.headers['content-type']).toContain('image/png');
     expect(file.rawPayload.length).toBeGreaterThan(0);
+  });
+
+  it('素材可以重命名与删除，且不能跨效果操作', async () => {
+    const created = await upload(PNG_DATA_URL, adminHeaders);
+    const asset = created.json<{ name: string }>();
+
+    const renamed = await app.inject({
+      method: 'PATCH',
+      url: `/api/css-effects/assets/${asset.name}`,
+      headers: adminHeaders,
+      payload: { effectId: EFFECT_ID, fileName: '新名字.png' },
+    });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json<{ fileName: string }>().fileName).toBe('新名字.png');
+
+    const crossRename = await app.inject({
+      method: 'PATCH',
+      url: `/api/css-effects/assets/${asset.name}`,
+      headers: adminHeaders,
+      payload: { effectId: 'eff-spinner', fileName: '越权.png' },
+    });
+    expect(crossRename.statusCode).toBe(404);
+
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `/api/css-effects/assets/${asset.name}?effectId=${EFFECT_ID}`,
+      headers: adminHeaders,
+    });
+    expect(removed.statusCode).toBe(204);
+
+    const file = await app.inject({ method: 'GET', url: `/api/css-effects/assets/${asset.name}` });
+    expect(file.statusCode).toBe(404);
+  });
+
+  it('新建效果时 draft 素材会转移到新效果', async () => {
+    const draftId = 'draft-test-assets';
+    const created = await upload(PNG_DATA_URL, adminHeaders, draftId);
+    const asset = created.json<{ name: string }>();
+
+    const effectResponse = await app.inject({
+      method: 'POST',
+      url: '/api/css-effects/effects',
+      headers: adminHeaders,
+      payload: { name: '带素材效果', effectType: 'css', draftId },
+    });
+    expect(effectResponse.statusCode).toBe(201);
+    const effectId = effectResponse.json<CssEffect>().id;
+
+    const assets = await listAssets(effectId, adminHeaders);
+    expect(assets.json<Array<{ name: string }>>().some((item) => item.name === asset.name)).toBe(
+      true,
+    );
+
+    // 草稿归属下不再有素材
+    const draftAssets = await listAssets(draftId, adminHeaders);
+    expect(draftAssets.json<Array<{ name: string }>>()).toHaveLength(0);
+  });
+
+  it('删除效果时同步清理其素材', async () => {
+    const created = await upload(PNG_DATA_URL, adminHeaders);
+    const asset = created.json<{ name: string }>();
+
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `/api/css-effects/effects/${EFFECT_ID}`,
+      headers: adminHeaders,
+    });
+    expect(removed.statusCode).toBe(204);
+
+    const file = await app.inject({ method: 'GET', url: `/api/css-effects/assets/${asset.name}` });
+    expect(file.statusCode).toBe(404);
   });
 
   it('非法 dataUrl 与不支持的类型返回 400', async () => {
