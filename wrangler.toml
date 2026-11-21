@@ -1,0 +1,26 @@
+# Cloudflare Workers Static Assets / Workers Builds 配置
+#
+# 背景：Cloudflare 现在把「Connect to Git / Import a repository」导入的静态站点
+# 归为 Workers Builds（Worker + Static Assets），而非传统 Pages。Workers Builds
+# 在构建完成后会执行一个单独的 Deploy command（默认裸 `npx wrangler deploy`）。
+# Wrangler 4 在 pnpm workspace 根目录运行时会启动 application detection，
+# 因无法确定要部署哪个 workspace 应用而报错：
+#   "The Cloudflare application detection logic has been run in the root of a workspace..."
+# 提供本配置，并在 Deploy command 里用 `-c wrangler.toml` 显式指定它，
+# 即可让 Wrangler 跳过 detection。
+#
+# 重要：name 必须与 Cloudflare Dashboard 中的项目名完全一致，
+# 否则会部署到一个同配置但不同名的 Worker，线上 URL 与面板显示的不一致。
+
+name = "ffm-web"
+compatibility_date = "2026-11-21"
+
+# 纯静态 SPA：没有 main 入口，只上传 assets 目录
+[assets]
+directory = "apps/web/dist"
+not_found_handling = "single-page-application"
+
+# - directory 相对本文件（仓库根），等价于 Dashboard 的 Build output directory。
+# - not_found_handling = "single-page-application" 提供 SPA 深链硬刷新回退，
+#   等价于传统 Pages 的 `/* /index.html 200`。
+# - 不要添加 [build] 段：构建命令在 Dashboard 的 Build command 里配置。

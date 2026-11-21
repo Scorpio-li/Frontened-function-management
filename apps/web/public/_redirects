@@ -1,9 +1,13 @@
-# Cloudflare Pages 路由规则（顺序敏感：具体规则必须在 catch-all 之前）
+# Cloudflare 路由规则（顺序敏感：具体规则必须在 catch-all 之前）
 #
 # 【可选】接入独立后端时，取消注释并把 api.example.com 换成后端公网域名。
 # 后端是有状态 Fastify 服务，不能跑在 Pages/Workers 上，须单独托管（见 docs/DEPLOY_GUIDE.md 第 8 节）。
-# 未启用时 /api/* 会落到下面的 SPA 回退，登录与所有数据功能不可用，属预期行为。
+# 未启用时 /api/* 会落到 SPA 回退，登录与所有数据功能不可用，属预期行为。
 # /api/*  https://api.example.com/api/:splat  200
 
-# React Router (BrowserRouter) SPA 回退：静态文件未命中时返回 index.html
-/*  /index.html  200
+# SPA 深链回退由 wrangler.toml 的 [assets] not_found_handling = "single-page-application" 提供。
+#
+# 不要启用下面这一行：Workers Static Assets 中 _redirects 的规则「无论静态文件是否命中都会先执行」，
+# catch-all 会把 /assets/*.js、/assets/*.css 也 rewrite 成 index.html，导致线上白屏。
+# 仅当改回「传统 Cloudflare Pages」项目（无 Deploy command、不使用 wrangler.toml）时才取消注释：
+# /*  /index.html  200
