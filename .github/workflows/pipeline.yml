@@ -1,0 +1,215 @@
+name: FFM CI/CD
+
+# 默认路线：Vercel / Cloudflare Pages 通过 GitHub 原生 Git 集成自动部署。
+# 本 workflow 默认只做质量门禁 + 构建归档；两个 deploy job 由仓库变量
+# EXTERNAL_CD_ENABLED=true 才会启用（切回「外部 CI + CLI 部署」路线时使用）。
+# 详见 docs/DEPLOY_GUIDE.md。
+#
+# 触发：push(master=生产 / dev=预览)、PR 到 master（预览）、手动（可指定目标与环境，用于复现/回滚）
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: '部署目标（覆盖仓库变量 DEPLOY_TARGET）'
+        required: true
+        default: cloudflare
+        type: choice
+        options: [cloudflare, vercel, both]
+      environment:
+        description: '部署环境'
+        required: true
+        default: preview
+        type: choice
+        options: [preview, production]
+
+# 最小权限：令牌默认只读，不做任何写操作
+permissions:
+  contents: read
+
+concurrency:
+  group: ffm-${{ github.workflow }}-${{ github.ref }}
+  # 生产分支的部署不允许被新推送取消，避免半途中断
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '10.34.9'
+
+jobs:
+  # ── ① 质量门禁：fail fast，最便宜的检查先跑 ──────────────────────────
+  verify:
+    name: ① 质量门禁
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: pnpm/action-setup@v4.1.0
+        with:
+          version: '10.34.9'
+          run_install: false
+      - uses: actions/setup-node@v4.1.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: 安装依赖（冻结 lockfile）
+        run: pnpm install --frozen-lockfile
+      - name: lint → typecheck → test
+        run: bash scripts/pipeline/verify.sh
+
+  # ── ② 单次构建 + 产物指纹 + 归档（build once, promote）─────────────────
+  build:
+    name: ② 构建并归档产物
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      dist_sha: ${{ steps.fingerprint.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: pnpm/action-setup@v4.1.0
+        with:
+          version: '10.34.9'
+          run_install: false
+      - uses: actions/setup-node@v4.1.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: 构建并校验产物完整性
+        run: bash scripts/pipeline/build.sh
+      - name: 记录产物指纹
+        id: fingerprint
+        run: echo "sha=$(cat dist-sha256.txt)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: web-dist-${{ github.sha }}
+          path: apps/web/dist
+          retention-days: 30
+          if-no-files-found: error
+
+  # ── ③ 决策层：一次解析目标/环境，下游 job 只读结果 ─────────────────────
+  context:
+    name: ③ 解析部署目标
+    runs-on: ubuntu-latest
+    outputs:
+      target: ${{ steps.ctx.outputs.target }}
+      mode: ${{ steps.ctx.outputs.mode }}
+    env:
+      DISPATCH_TARGET: ${{ inputs.target }}
+      DISPATCH_ENV: ${{ inputs.environment }}
+      REPO_TARGET: ${{ vars.DEPLOY_TARGET }}
+      EVENT: ${{ github.event_name }}
+      REF: ${{ github.ref }}
+    steps:
+      - id: ctx
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "target=$DISPATCH_TARGET" >> "$GITHUB_OUTPUT"
+            echo "mode=$DISPATCH_ENV" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=${REPO_TARGET:-cloudflare}" >> "$GITHUB_OUTPUT"
+            if [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/master" ]; then
+              echo "mode=production" >> "$GITHUB_OUTPUT"
+            else
+              echo "mode=preview" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          cat "$GITHUB_OUTPUT"
+
+  # ── ④ Cloudflare Pages：严格复用 ② 的产物 ─────────────────────────────
+  deploy-cloudflare:
+    name: ④ Cloudflare Pages (${{ needs.context.outputs.mode }})
+    needs: [build, context]
+    if: >-
+      (needs.context.outputs.target == 'cloudflare' || needs.context.outputs.target == 'both')
+      && vars.EXTERNAL_CD_ENABLED == 'true'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: ${{ needs.context.outputs.mode }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
+      WRANGLER_CLI_VERSION: ${{ vars.WRANGLER_CLI_VERSION }}
+      CF_PRODUCTION_BRANCH: ${{ vars.CF_PRODUCTION_BRANCH }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: pnpm/action-setup@v4.1.0
+        with:
+          version: '10.34.9'
+          run_install: false
+      - uses: actions/setup-node@v4.1.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          name: web-dist-${{ github.sha }}
+          path: apps/web/dist
+      - name: 发布（复用 ② 的同一份字节）
+        run: bash scripts/pipeline/deploy-cloudflare.sh "${{ needs.context.outputs.mode }}"
+      - name: 部署后冒烟检查
+        run: bash scripts/pipeline/smoke.sh "$(cat deployment-url.txt)"
+        env:
+          SMOKE_API: ${{ vars.SMOKE_API }}
+      - name: 写入部署摘要
+        if: always()
+        run: |
+          {
+            echo "## Cloudflare Pages 部署"
+            echo "- 环境: ${{ needs.context.outputs.mode }}"
+            echo "- commit: ${{ github.sha }}"
+            echo "- dist-sha256: ${{ needs.build.outputs.dist_sha }}"
+            echo "- URL: $(cat deployment-url.txt 2>/dev/null || echo '部署失败，无 URL')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── ⑤ Vercel：官方外部流水线 pull → build → deploy --prebuilt ──────────
+  deploy-vercel:
+    name: ⑤ Vercel (${{ needs.context.outputs.mode }})
+    needs: [build, context]
+    if: >-
+      (needs.context.outputs.target == 'vercel' || needs.context.outputs.target == 'both')
+      && vars.EXTERNAL_CD_ENABLED == 'true'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: ${{ needs.context.outputs.mode }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_CLI_VERSION: ${{ vars.VERCEL_CLI_VERSION }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: pnpm/action-setup@v4.1.0
+        with:
+          version: '10.34.9'
+          run_install: false
+      - uses: actions/setup-node@v4.1.0
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: 安装依赖（vercel build 会执行 buildCommand，需要工作区依赖）
+        run: pnpm install --frozen-lockfile
+      - name: 发布（pull → build → deploy --prebuilt）
+        run: bash scripts/pipeline/deploy-vercel.sh "${{ needs.context.outputs.mode }}"
+      - name: 部署后冒烟检查
+        run: bash scripts/pipeline/smoke.sh "$(cat deployment-url.txt)"
+        env:
+          SMOKE_API: ${{ vars.SMOKE_API }}
+      - name: 写入部署摘要
+        if: always()
+        run: |
+          {
+            echo "## Vercel 部署"
+            echo "- 环境: ${{ needs.context.outputs.mode }}"
+            echo "- commit: ${{ github.sha }}"
+            echo "- dist-sha256（② 产物，Vercel 路径会重新构建）: ${{ needs.build.outputs.dist_sha }}"
+            echo "- URL: $(cat deployment-url.txt 2>/dev/null || echo '部署失败，无 URL')"
+          } >> "$GITHUB_STEP_SUMMARY"

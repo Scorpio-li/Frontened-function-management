@@ -1,0 +1,40 @@
+# Gitee Go 流水线：仅做质量门禁，不部署。
+# 当前部署路线为「GitHub 原生 Git 集成」——代码同步到 GitHub 后，由 Vercel / Cloudflare Pages
+# 自动构建发布。Gitee 保持为开发主仓；Gitee Go 与 GitHub Actions 二选一启用即可（同时开会重复跑门禁）。
+# 若要切回「外部 CI + CLI 部署」，在末尾补回部署步骤，见 docs/DEPLOY_GUIDE.md 第 9 节。
+#
+# 注意（语法提示）：Gitee Go 历史上存在两套 YAML 语法——
+#    1) 类 GitHub Actions 风格：.gitee/workflows/*.yml（本文件采用）
+#    2) 原生风格：.workflow/*.yml（version / displayName / triggers / stages / steps）
+#    若控制台导入时提示语法不兼容，请在 Gitee Go「可视化编排」里按下述 4 个 step
+#    原样重建即可，脚本一行都不用改。secrets/vars 的变量名以 Gitee Go 控制台为准。
+name: ffm-pipeline
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+    branches: [master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Node 与 pnpm（版本与 packageManager 对齐）
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.34.9 --activate
+          node --version
+          pnpm --version
+
+      - name: 质量门禁（lint → typecheck → test）
+        run: bash scripts/pipeline/verify.sh
+
+      - name: 单次构建 + 产物完整性校验
+        run: bash scripts/pipeline/build.sh
+
+      # 不部署：发布由 GitHub 推送触发的 Vercel / Cloudflare Pages Git 集成完成。
+      # 切回外部 CI 路线时，在此补回 deploy-cloudflare.sh / deploy-vercel.sh 与 smoke.sh 两步。

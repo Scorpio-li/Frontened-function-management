@@ -1,0 +1,9 @@
+# Cloudflare Pages 路由规则（顺序敏感：具体规则必须在 catch-all 之前）
+#
+# 【可选】接入独立后端时，取消注释并把 api.example.com 换成后端公网域名。
+# 后端是有状态 Fastify 服务，不能跑在 Pages/Workers 上，须单独托管（见 docs/DEPLOY_GUIDE.md 第 8 节）。
+# 未启用时 /api/* 会落到下面的 SPA 回退，登录与所有数据功能不可用，属预期行为。
+# /api/*  https://api.example.com/api/:splat  200
+
+# React Router (BrowserRouter) SPA 回退：静态文件未命中时返回 index.html
+/*  /index.html  200

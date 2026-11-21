@@ -24,3 +24,9 @@ apps/server/data/
 # logs & os
 *.log
 .DS_Store
+
+# CI/CD 本地产物（含项目绑定信息，不入库）
+.vercel/
+.wrangler/
+deployment-url.txt
+deploy.log
