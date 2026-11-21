@@ -17,6 +17,8 @@ coverage/
 .env
 .env.*
 !.env.example
+!apps/server/.env.docker.example
+# .env.docker 含真实管理员密码 / SMTP 授权码，必须保持被忽略
 
 # local runtime data
 apps/server/data/

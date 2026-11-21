@@ -1,0 +1,102 @@
+name: ffm
+
+# 基础用法（本地验证）：
+#   docker compose up -d --build server
+#   curl -i http://127.0.0.1:3001/api/health
+#
+# 生产 HTTPS 出口三选一（见 docs/DOCKER_DEPLOY.md 第 4 节）：
+#   docker compose --profile tls    up -d --build      # Caddy 自动证书
+#   docker compose --profile tunnel up -d --build      # Cloudflare Tunnel（需自有域名）
+#   docker compose --profile ngrok  up -d --build      # ngrok 免费固定 dev domain（无需域名）
+#
+# 三个 profile 不要同时启用（都会占用对外入口，且只需一个）。
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ffm-server:local
+    restart: unless-stopped
+    # 密钥只从该文件注入，不写进 compose / 镜像 / 仓库。
+    # 先执行：cp apps/server/.env.docker.example apps/server/.env.docker
+    env_file:
+      - ./apps/server/.env.docker
+    # 非敏感项在此固定，覆盖 env_file 中可能误填的值。
+    environment:
+      NODE_ENV: production
+      FFM_HOST: 0.0.0.0
+      FFM_PORT: '3001'
+      FFM_DATA_DIR: /app/data
+    # 只绑定本机回环：公网流量一律经 Caddy / Tunnel 进入，不直接暴露 3001。
+    ports:
+      - '127.0.0.1:3001:3001'
+    volumes:
+      # 账号、效果数据、上传图片全部落在 apps/server/data 对应的卷里。
+      - ffm-data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:'+(process.env.FFM_PORT||3001)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  # 方案 A：自有 VPS + 域名 DNS 指向该机，Caddy 自动申请 / 续期 Let's Encrypt 证书。
+  caddy:
+    profiles: ['tls']
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      # 必须在根目录 .env 覆盖成自己的真实域名；api.example.com 仅为占位示例
+      FFM_API_DOMAIN: ${FFM_API_DOMAIN:-api.example.com}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      server:
+        condition: service_healthy
+
+  # 方案 B：无公网 IP / 不想管理证书时用 Cloudflare Tunnel。
+  # 面板里加 Published application route，Service URL = http://server:3001
+  # （新版界面：隧道详情 → Routes → Add route → Published application）。
+  # 若 cloudflared 在宿主机单独跑，Service URL 改用 http://127.0.0.1:3001。
+  # 保存后还需确认 DNS 有 api.<你的域名> 的 CNAME -> <UUID>.cfargotunnel.com，
+  # 新版界面不再保证自动创建；详见 docs/DOCKER_DEPLOY.md 4.2。
+  cloudflared:
+    profiles: ['tunnel']
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN:-}
+    depends_on:
+      server:
+        condition: service_healthy
+
+  # 方案 C：无自有域名、又想要固定 HTTPS 地址时用 ngrok 免费版（见文档 4.2）。
+  # 免费计划自动分配一个绑定账号的 dev domain（*.ngrok-free.app），重启 agent 不变；
+  # ngrok http 会自动使用它，不需要 --domain / --url（那是付费版自定义域名）。
+  # 仓库根 .env 里配置 NGROK_AUTHTOKEN，绝不要写进 compose 或镜像。
+  ngrok:
+    profiles: ['ngrok']
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    command: ['http', 'http://server:3001']
+    ports:
+      - '127.0.0.1:4040:4040' # 本地请求检查界面
+    depends_on:
+      server:
+        condition: service_healthy
+
+volumes:
+  ffm-data:
+  caddy-data:
+  caddy-config:

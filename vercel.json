@@ -6,11 +6,19 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://overexert-decree-ground.ngrok-free.dev/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
+    {
+      "source": "/api/:path*",
+      "headers": [{ "key": "CDN-Cache-Control", "value": "no-store" }]
+    },
     {
       "source": "/(.*)",
       "headers": [

@@ -1,13 +1,18 @@
-# Cloudflare 路由规则（顺序敏感：具体规则必须在 catch-all 之前）
+# Cloudflare Workers Static Assets 路由规则
 #
-# 【可选】接入独立后端时，取消注释并把 api.example.com 换成后端公网域名。
-# 后端是有状态 Fastify 服务，不能跑在 Pages/Workers 上，须单独托管（见 docs/DEPLOY_GUIDE.md 第 8 节）。
-# 未启用时 /api/* 会落到 SPA 回退，登录与所有数据功能不可用，属预期行为。
-# /api/*  https://api.example.com/api/:splat  200
+# 【重要】Workers 的 _redirects 不支持代理外部域名，官方原文：
+#   "Proxying will only support relative URLs on your site. You cannot proxy external domains."
+# 所以不能像传统 Cloudflare Pages 那样用 `/api/* https://... 200` 把请求转发到后端，
+# 照抄会静默失效。本项目改由 worker/index.js 代理，配合 wrangler.toml 的
+#   main / [assets] binding = "ASSETS" / run_worker_first = ["/api/*"]
+# 只需在 Cloudflare 项目变量里设置 API_ORIGIN 即可，无需改动本文件。
+#
+# 仅当把项目重建为「传统 Cloudflare Pages」（没有 wrangler.toml、没有 Deploy command）时，
+# 才启用下面这种写法，并同时把 SPA 回退搬回本文件：
+# /api/*  https://api.<你的域名>/api/:splat  200
+# /*  /index.html  200
 
 # SPA 深链回退由 wrangler.toml 的 [assets] not_found_handling = "single-page-application" 提供。
 #
-# 不要启用下面这一行：Workers Static Assets 中 _redirects 的规则「无论静态文件是否命中都会先执行」，
-# catch-all 会把 /assets/*.js、/assets/*.css 也 rewrite 成 index.html，导致线上白屏。
-# 仅当改回「传统 Cloudflare Pages」项目（无 Deploy command、不使用 wrangler.toml）时才取消注释：
-# /*  /index.html  200
+# 不要启用 catch-all：Workers 中 _redirects 的规则「无论静态文件是否命中都会先执行」，
+# `/* /index.html 200` 会把 /assets/*.js、/assets/*.css 也 rewrite 成 index.html，线上白屏。

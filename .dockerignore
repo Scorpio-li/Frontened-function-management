@@ -1,0 +1,46 @@
+# 构建上下文白名单式排除：只保留 pnpm install / build / deploy 必需的文件。
+# 注意：所有 workspace 包的 package.json 必须保留，否则 --frozen-lockfile 会
+# 判定 workspace 与 pnpm-lock.yaml 不一致而报错。
+
+# 版本库与工具缓存
+.git
+.gitignore
+.github
+.gitee
+.husky
+.changeset
+**/.turbo
+**/coverage
+**/.cache
+
+# 依赖与产物（镜像内重新生成）
+**/node_modules
+**/dist
+**/build
+**/.vite
+
+# 本地运行时数据：含真实账号与上传图片，绝不能进镜像
+apps/server/data
+**/data/css-effect-assets
+
+# 密钥与本地配置：含真实管理员密码 / SMTP 授权码
+**/.env
+**/.env.*
+!**/.env.example
+
+# 与镜像构建无关的内容
+docs
+scripts
+*.md
+AGENTS.md
+LICENSE
+_tmp_*
+**/.DS_Store
+**/*.log
+
+# Docker 自身文件（避免无意义地使构建缓存失效）
+Dockerfile
+.dockerignore
+docker-compose*.yml
+Caddyfile
+worker

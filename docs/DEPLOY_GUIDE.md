@@ -87,16 +87,19 @@ git publish
 
 | 文件                                                      | 作用                                                               | 缺失后果                                      |
 | --------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------- |
-| `vercel.json`                                             | Vercel 构建命令、输出目录、SPA rewrites、安全头、缓存              | Vercel 可能部署仓库根目录导致空白页           |
-| `wrangler.toml`                                           | Workers Builds 项目声明、`[assets]` 目录、SPA 回退                 | `wrangler deploy` 在 workspace 根目录拒绝部署 |
-| `apps/web/public/_headers`                                | 安全响应头 + `/assets/*` immutable 缓存（Pages 与 Workers 均生效） | 缺安全头、缓存策略失效                        |
-| `apps/web/public/_redirects`                              | 可选的后端 `/api` 反代；SPA catch-all 已注释，见下方说明           | 仅影响 `/api` 代理                            |
+| `vercel.json`                                             | 构建命令、输出目录、SPA rewrites、`/api` 反代、安全头与缓存        | 部署仓库根目录导致空白页；`/api` 不通         |
+| `wrangler.toml`                                           | Workers Builds 项目声明、`main`、静态资源与 SPA 回退、`/api` 路由  | `wrangler deploy` 在 workspace 根目录拒绝部署 |
+| `worker/index.js`                                         | Workers 的 `/api` 反向代理脚本（`wrangler.toml` 的 `main` 指向它） | 找不到入口，Cloudflare 部署失败               |
+| `apps/web/public/_headers`                                | 安全响应头 + `/assets/*` immutable 缓存                            | 缺安全头、缓存策略失效                        |
+| `apps/web/public/_redirects`                              | 仅保留说明性注释；Workers 下不负责任何代理                         | 无                                            |
 | `pnpm-workspace.yaml` / `pnpm-lock.yaml` / `package.json` | pnpm workspace 依赖解析与冻结安装                                  | 构建失败或依赖漂移                            |
 | `.node-version`                                           | 固定 Node 22，Cloudflare / Vercel 都会自动读取                     | 构建镜像滚动升级导致 Node 版本漂移            |
 
 Vite 会把 `public/` 下的文件原样复制进 `dist/`，所以 `_redirects`、`_headers` 会自动进入产物，不需要额外脚本。
 
-**为什么 `_redirects` 里的 SPA catch-all 被注释掉了**：Workers Static Assets 的 `_redirects` 规则「无论静态文件是否命中都会先执行」，`/* /index.html 200` 会把 `/assets/*.js`、`/assets/*.css` 也 rewrite 成 index.html，造成线上白屏。SPA 回退改由 `wrangler.toml` 的 `not_found_handling = "single-page-application"` 提供（Pages 与 Workers 都正确）。只有当你改回**传统 Pages 项目**、且不使用 `wrangler.toml` 时，才需要把那行注释取消。
+**为什么 `_redirects` 里的 SPA catch-all 被注释掉了**：Workers Static Assets 的 `_redirects` 规则「无论静态文件是否命中都会先执行」，`/* /index.html 200` 会把 `/assets/*.js`、`/assets/*.css` 也 rewrite 成 index.html，造成线上白屏。SPA 回退改由 `wrangler.toml` 的 `not_found_handling = "single-page-application"` 提供。只有当你改回**传统 Pages 项目**、且不使用 `wrangler.toml` 时，才需要把那行注释取消。
+
+**为什么后端 `/api` 代理不用 `_redirects`**：Workers 的 `_redirects` 明确不支持代理外部域名（"You cannot proxy external domains"），只有传统 Pages 可以。本项目是 Workers Builds，所以走 `worker/index.js` + `wrangler.toml` 的 `run_worker_first`，详见 `docs/DOCKER_DEPLOY.md` 第 6 节。
 
 ---
 
@@ -201,13 +204,14 @@ Cloudflare 的创建入口现在有两种，配置方式不同：
 
 ### 4.3 环境变量（Settings → Environment variables）
 
-按下面表格设置，**Production 与 Preview 两套环境都要各加一遍**（Cloudflare 环境变量按环境隔离，只加 Production 时预览分支的部署仍会用旧值）。其中 `PNPM_VERSION` 是修复 lockfile 报错的必要条件：
+按下面表格设置**构建阶段环境变量**，**按面板显示的环境分别添加**（Cloudflare 按环境隔离，只加 Production 时预览分支的部署仍会用旧值）。其中 `PNPM_VERSION` 是修复 lockfile 报错的必要条件：
 
-| 变量                      | 值        | 作用                                                                                                                                                            |
-| ------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PNPM_VERSION`            | `10.34.9` | **最关键**。v3 镜像默认 pnpm 10.11.1（v2 更低），且 v3 明确不支持从 `pnpm-lock.yaml` 或 `package.json` 推断 pnpm 版本；必须显式对齐 `packageManager` 的精确版本 |
-| `SKIP_DEPENDENCY_INSTALL` | `1`       | 关闭平台自动安装，避免与 Build command 里的安装重复执行，让依赖解析完全由仓库命令控制                                                                           |
-| `NODE_VERSION`            | `22`      | 固定 Node 22（v3 默认 22.23.4，会滚动更新）；仓库内 `.node-version` 已写 `22`，两处保持一致即可                                                                 |
+| 变量                                                                                                                                                                                                                                                                                                                                                                        | 值        | 作用                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PNPM_VERSION`                                                                                                                                                                                                                                                                                                                                                              | `10.34.9` | **最关键**。v3 镜像默认 pnpm 10.11.1（v2 更低），且 v3 明确不支持从 `pnpm-lock.yaml` 或 `package.json` 推断 pnpm 版本；必须显式对齐 `packageManager` 的精确版本 |
+| `SKIP_DEPENDENCY_INSTALL`                                                                                                                                                                                                                                                                                                                                                   | `1`       | 关闭平台自动安装，避免与 Build command 里的安装重复执行，让依赖解析完全由仓库命令控制                                                                           |
+| `NODE_VERSION`                                                                                                                                                                                                                                                                                                                                                              | `22`      | 固定 Node 22（v3 默认 22.23.4，会滚动更新）；仓库内 `.node-version` 已写 `22`，两处保持一致即可                                                                 |
+| **注意**：`API_ORIGIN` 不在这个表里，也不在这个页面设置。它是 Worker **运行时**变量（`worker/index.js` 读 `env.API_ORIGIN`），与上表三个构建变量不同：推荐直接写进 `wrangler.toml` 的 `[vars]`；若改在 Dashboard，位置是 **Settings → Variables and secrets**，且必须加 `keep_vars = true`，否则会被下一次 `wrangler deploy` 覆盖。详见 `docs/DOCKER_DEPLOY.md` 第 6.2 节。 |
 
 变量值不要加引号、不要带 `v` 前缀。密钥类变量（若以后接入）勾选 **Encrypt**，保存后不可再查看明文。
 
@@ -335,21 +339,15 @@ curl -sI https://<CF 域名>/assets/index-xxxx.js | grep -i cache-control
 
 ## 8. 可选进阶：接回有状态后端
 
-后端必须部署在**长驻进程**环境（容器 / 轻量服务器 / Fly.io / Railway 等），或先做无状态化改造（外置数据库 + 对象存储 + 签名会话）。拿到公网 HTTPS 域名 `https://api.example.com` 后：
+完整方案（Docker 镜像、持久卷、HTTPS 出口、两端 `/api` 接入、端到端验证与运维）见 **`docs/DOCKER_DEPLOY.md`**。这里只列与前端部署直接相关的结论。
 
-**Vercel**：在 `vercel.json` 的 `rewrites` 数组**最前面**插入一条（顺序敏感，`/(.*)` 必须在最后）：
+后端必须部署在**长驻进程**环境（容器 / 轻量服务器 / Fly.io / Railway 等），或先做无状态化改造（外置数据库 + 对象存储 + 签名会话）。拿到公网 HTTPS 域名 `https://api.<你的域名>` 后（文档里的 `api.example.com` 均为占位示例，不是可用地址）：
 
-```json
-{ "source": "/api/:path*", "destination": "https://api.example.com/api/:path*" }
-```
+**Vercel**：`vercel.json` 的 `rewrites` 首条已预留 `/api/:path* → https://REPLACE_WITH_YOUR_API_ORIGIN/api/:path*`，把占位字符串换成真实域名即可（顺序敏感，`/api` 必须在 `/(.*)` catch-all 之前）。`headers` 里 `/api/:path*` 的 `CDN-Cache-Control: no-store` 用于阻止 Vercel 缓存外部 origin 的 API 响应，**不要删除**，否则可能串号。
 
-**Cloudflare**：取消 `apps/web/public/_redirects` 中 `/api/*` 那行的注释并替换域名（`_redirects` 在 Pages 与 Workers Static Assets 下都生效）：
+**Cloudflare（Workers Builds）**：不能用 `_redirects` 代理外部域名——官方明确写着 "You cannot proxy external domains"，只有传统 Pages 支持（当初的注释有误，现已纠正）。本项目改由 `worker/index.js` 转发，配合 `wrangler.toml` 的 `main` / `[assets] binding` / `run_worker_first = ["/api/*"]`；把 `API_ORIGIN` 写进 `wrangler.toml` 的 `[vars]` 并重新部署即可（**不要只在 Dashboard 里加**，会被下一次 `wrangler deploy` 覆盖；详见 `docs/DOCKER_DEPLOY.md` 6.2）。**不要**取消 `_redirects` 里 `/api/*` 那行的注释，它现在只作为「传统 Pages」的对照示例保留。
 
-```text
-/api/*  https://api.example.com/api/:splat  200
-```
-
-不要顺手把 SPA catch-all 也取消注释，原因见 4.6。因为浏览器看到的仍是前端同源域名（平台做反向代理），HttpOnly Cookie 不会因跨站失效，无需改 `SameSite`。
+同样不要启用 SPA catch-all，原因见 4.6。因为浏览器看到的仍是前端同源域名（平台做服务端反向代理），HttpOnly + SameSite=Lax Cookie 不会因跨站失效，前端代码零改动，也无需 CORS。
 
 后端环境变量 `FFM_ADMIN_PASSWORD`、`FFM_ADMIN_USERNAME`、`SMTP_HOST/PORT/USER/PASS/FROM` 只配置在后端服务上，**绝不**放进 Vercel / Cloudflare 的前端项目环境变量。接好后可在 CI 里设 `SMOKE_API=1` 启用 `/api/health` 探针。
 
@@ -377,7 +375,8 @@ curl -sI https://<CF 域名>/assets/index-xxxx.js | grep -i cache-control
 | 同一次 push 产生两个部署                                    | `.github/workflows/pipeline.yml` 的 deploy job 仍在跑   | 保持 `EXTERNAL_CD_ENABLED` 未设置（默认 false）                                    |
 | `Ignoring not compatible lockfile` + `ERR_PNPM_NO_LOCKFILE` | 平台 pnpm 版本低于生成 lockfile 的版本，锁文件被无视    | CF 设 `PNPM_VERSION=10.34.9` + `SKIP_DEPENDENCY_INSTALL=1` 后 Retry，详见 4.5      |
 | `application detection logic ... root of a workspace`       | Workers Builds 跑裸 `wrangler deploy`，无 Wrangler 配置 | 提交 `wrangler.toml` + Deploy command 加 `-c wrangler.toml`，详见 4.6              |
-| `Detected ... pnpm@9.x` / 变量改了没变化                    | 变量没保存、只加了 Production、或没重新触发部署         | 两套环境都加；改完 Retry deployment；检查日志首行                                  |
+| `Detected ... pnpm@9.x` / 变量改了没变化                    | 变量没保存、加错环境、或没重新触发部署                  | 按面板环境分别添加；改完 Retry deployment；检查日志首行                            |
+| Cloudflare `/api` 返回 503「API_ORIGIN 未配置」             | 只在 Dashboard 设了变量，被 `wrangler deploy` 覆盖      | 写进 `wrangler.toml` 的 `[vars]`（或加 `keep_vars = true`），见 DOCKER_DEPLOY 6.2  |
 | `pnpm: command not found` / `ERR_PNPM_OUTDATED_LOCKFILE`    | 平台 pnpm 版本不符，或 lockfile 与 package.json 不同步  | Vercel 设 `ENABLE_EXPERIMENTAL_COREPACK=1`；本地 `pnpm install` 后一并提交两个文件 |
 | `Cannot find module 'vite'` / `tsc`                         | `NODE_ENV=production` 下 devDependencies 未安装         | Install Command 加 `--prod=false`                                                  |
 | `Corepack cannot find matching keyid`                       | Corepack 签名密钥过旧                                   | 改用 `npm i -g pnpm@10.34.9 && pnpm install --frozen-lockfile --prod=false`        |

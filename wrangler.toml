@@ -1,13 +1,11 @@
-# Cloudflare Workers Static Assets / Workers Builds 配置
+# Cloudflare Workers Builds / Workers Static Assets 配置
 #
-# 背景：Cloudflare 现在把「Connect to Git / Import a repository」导入的静态站点
+# 背景：Cloudflare 把「Connect to Git / Import a repository」导入的静态站点
 # 归为 Workers Builds（Worker + Static Assets），而非传统 Pages。Workers Builds
 # 在构建完成后会执行一个单独的 Deploy command（默认裸 `npx wrangler deploy`）。
-# Wrangler 4 在 pnpm workspace 根目录运行时会启动 application detection，
-# 因无法确定要部署哪个 workspace 应用而报错：
+# Wrangler 4 在 pnpm workspace 根目录会启动 application detection 并拒绝猜测应用：
 #   "The Cloudflare application detection logic has been run in the root of a workspace..."
-# 提供本配置，并在 Deploy command 里用 `-c wrangler.toml` 显式指定它，
-# 即可让 Wrangler 跳过 detection。
+# 用 `-c wrangler.toml` 显式指定本配置即可跳过 detection。
 #
 # 重要：name 必须与 Cloudflare Dashboard 中的项目名完全一致，
 # 否则会部署到一个同配置但不同名的 Worker，线上 URL 与面板显示的不一致。
@@ -15,12 +13,45 @@
 name = "ffm-web"
 compatibility_date = "2026-11-21"
 
-# 纯静态 SPA：没有 main 入口，只上传 assets 目录
+# 接入独立后端后不再是纯静态站点：Worker 脚本负责把 /api/* 代理到后端。
+# Workers 的 _redirects 不支持代理外部域名，只能这样做（见 worker/index.js）。
+main = "worker/index.js"
+
 [assets]
 directory = "apps/web/dist"
 not_found_handling = "single-page-application"
+binding = "ASSETS"
+# 只对 /api/* 先执行 Worker；其余请求走 asset-first，静态未命中时
+# 仍由 Worker 里的 env.ASSETS.fetch(request) 应用 SPA 回退。
+run_worker_first = ["/api/*"]
 
 # - directory 相对本文件（仓库根），等价于 Dashboard 的 Build output directory。
-# - not_found_handling = "single-page-application" 提供 SPA 深链硬刷新回退，
-#   等价于传统 Pages 的 `/* /index.html 200`。
+# - not_found_handling 提供 SPA 深链硬刷新回退，等价于 Pages 的 `/* /index.html 200`。
 # - 不要添加 [build] 段：构建命令在 Dashboard 的 Build command 里配置。
+
+# ── API_ORIGIN：后端 HTTPS 域名（纯 origin，不带路径 / 末尾斜杠） ──────────
+#
+# 【本项目采用】写在下面的 [vars] 里，值与 vercel.json 的 rewrite 目标保持一致。
+# 理由：Deploy command 是 `npx wrangler deploy -c wrangler.toml`，Wrangler 以
+# 配置文件为 source of truth —— 官方明确说明「在 Dashboard 里改的环境变量会在
+# 下一次 wrangler deploy 时被覆盖」（除非设置 keep_vars = true）。只在 Dashboard
+# 里加变量，每次 push 后都会被清掉，/api 又变回 503。API_ORIGIN 只是公开域名、
+# 不是密钥，符合官方「非敏感配置放 [vars]」的建议，且随 git 可回滚。生产与
+# 分支部署都用这一份 wrangler.toml，只需写一处。
+
+[vars]
+API_ORIGIN = "https://overexert-decree-ground.ngrok-free.dev"
+#
+# 【备选，Dashboard】Workers & Pages → 选中 Worker → Settings →
+# Variables and secrets → 切换到 Production / Previews Base 各加一份。
+# 若改用此方式，须先删掉上面的 [vars]，并在本文件顶层加 keep_vars = true
+# （或部署命令加 --keep-vars），否则下次部署会把 Dashboard 里手加的变量清空。
+# Workers Previews 不继承生产设置，且官方要求在 Dashboard 改完后把生成的
+# previews 配置复制回本文件。密钥一律用 Secret 类型 / wrangler secret put，
+# 不要写进 [vars]。
+#
+# 若将来把非生产分支命令改为 `npx wrangler preview`，还需加 [previews.vars]
+# 段（Previews 不继承顶层 [vars]）；当前用 versions upload 则不需要。
+#
+# 域名变更时同时改 vercel.json 的 rewrites 目标与这里的 API_ORIGIN，然后
+# commit + push 并 Retry deployment。未设置时 worker/index.js 返回 503 明确提示。
