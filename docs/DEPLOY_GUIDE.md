@@ -39,12 +39,12 @@
 
 ### 1.2 先提交本轮配置，再推送
 
-平台第一次构建必须能看到 `vercel.json`、`_redirects`、`_headers`，所以先提交：
+平台第一次构建必须能看到 `vercel.json`、`_redirects`、`_headers`、`.node-version`，所以先提交：
 
 ```bash
 cd /Users/lizhiliang/Desktop/Gitee/Frontened-function-management
 
-git add .gitignore vercel.json \
+git add .gitignore vercel.json .node-version \
         apps/web/public/_redirects apps/web/public/_headers \
         .github/workflows/pipeline.yml .gitee/workflows/pipeline.yml \
         scripts/pipeline docs/DEPLOY_GUIDE.md
@@ -88,6 +88,7 @@ git publish
 | `apps/web/public/_redirects`                              | Cloudflare SPA 回退 `/* /index.html 200`              | 深链接硬刷新 404                    |
 | `apps/web/public/_headers`                                | 安全响应头 + `/assets/*` immutable 缓存               | 缺安全头、缓存策略失效              |
 | `pnpm-workspace.yaml` / `pnpm-lock.yaml` / `package.json` | pnpm workspace 依赖解析与冻结安装                     | 构建失败或依赖漂移                  |
+| `.node-version`                                           | 固定 Node 22，Cloudflare / Vercel 都会自动读取        | 构建镜像滚动升级导致 Node 版本漂移  |
 
 Vite 会把 `public/` 下的文件原样复制进 `dist/`，所以 `_redirects`、`_headers` 会自动进入产物，不需要额外脚本。
 
@@ -110,7 +111,7 @@ Vite 会把 `public/` 下的文件原样复制进 `dist/`，所以 `_redirects`�
 | Build Command    | `pnpm --filter @repo/web build`  | 已写在 `vercel.json`，Dashboard 可留空让文件生效   |
 | Output Directory | `apps/web/dist`                  | 已写在 `vercel.json`，相对 Root Directory          |
 | Install Command  | `pnpm install --frozen-lockfile` | 已写在 `vercel.json`                               |
-| Node.js Version  | `22.x`                           | 与本地已验证的 Node 22 一致                        |
+| Node.js Version  | `22.x`                           | 与仓库 `.node-version` 一致                        |
 
 注意：`vercel.json` 中的字段优先级高于 Dashboard 覆盖值，两边保持一致即可，不要只改一处。
 
@@ -127,6 +128,8 @@ npm i -g pnpm@10.34.9 && pnpm install --frozen-lockfile --prod=false
 ```
 
 `--prod=false` 很关键：Vercel 构建时 `NODE_ENV=production`，不带它会导致 TypeScript、Vite、Turbo 等 devDependencies 不被安装，构建失败。
+
+若 Vercel 日志同样出现 `Ignoring not compatible lockfile` / `ERR_PNPM_NO_LOCKFILE`，说明 `ENABLE_EXPERIMENTAL_COREPACK` 没生效、Vercel 用了镜像自带的旧 pnpm 解析锁文件；按上面的 Install Command 覆盖方式处理，原理见 4.5。
 
 本项目前端**不注入任何 `VITE_` 变量**，因此不要把 `FFM_ADMIN_PASSWORD`、`SMTP_PASS` 等密钥放进 Vercel 环境变量，尤其不要以 `VITE_` 开头（会被打进客户端 bundle）。
 
@@ -167,19 +170,25 @@ npm i -g pnpm@10.34.9 && pnpm install --frozen-lockfile --prod=false
 
 **Root directory 藏在 Advanced settings 折叠面板里**，需要展开才能看到。monorepo 最常见的首部翻车就是这一项：填错时构建会成功、部署也成功，但线上是 404 或空白页，且日志里没有任何报错。
 
+**Build command 之前还有一步自动安装**：Cloudflare 在执行你填的 Build command **之前**，会先跑平台自带的「自动依赖安装」`pnpm install --frozen-lockfile`，日志里 `Installing project dependencies: ...` 就是它。这一步用的 pnpm 由 `PNPM_VERSION` 决定，**不受你的 Build command 控制**；本次失败就发生在这一步，所以当时改 Build command 是无效的。配合 `SKIP_DEPENDENCY_INSTALL=1` 可以关掉它，让安装只由 Build command 执行一次。
+
 **备选方案**（仅当 output directory 不接受嵌套路径时使用）：Root directory 填 `apps/web`，Build command 改成 `cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @repo/web build`，Build output directory 填 `dist`。
 
 ### 4.3 环境变量（Settings → Environment variables）
 
-Production 与 Preview 两套都要加：
+按下面表格设置，**Production 与 Preview 两套环境都要各加一遍**（Cloudflare 环境变量按环境隔离，只加 Production 时预览分支的部署仍会用旧值）。其中 `PNPM_VERSION` 是修复 lockfile 报错的必要条件：
 
-| 变量                      | 值        | 作用                                                                                          |
-| ------------------------- | --------- | --------------------------------------------------------------------------------------------- |
-| `NODE_VERSION`            | `22`      | v3 构建镜像默认 Node 22.16.0，显式固定避免镜像升级导致漂移                                    |
-| `PNPM_VERSION`            | `10.34.9` | v3 默认 pnpm 10.11.1，与项目 `packageManager` 不一致，必须显式覆盖                            |
-| `SKIP_DEPENDENCY_INSTALL` | `1`       | 跳过平台自动安装，由 Build command 里的 `pnpm install --frozen-lockfile` 全权负责，保证可复现 |
+| 变量                      | 值        | 作用                                                                                                                                                            |
+| ------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PNPM_VERSION`            | `10.34.9` | **最关键**。v3 镜像默认 pnpm 10.11.1（v2 更低），且 v3 明确不支持从 `pnpm-lock.yaml` 或 `package.json` 推断 pnpm 版本；必须显式对齐 `packageManager` 的精确版本 |
+| `SKIP_DEPENDENCY_INSTALL` | `1`       | 关闭平台自动安装，避免与 Build command 里的安装重复执行，让依赖解析完全由仓库命令控制                                                                           |
+| `NODE_VERSION`            | `22`      | 固定 Node 22（v3 默认 22.23.4，会滚动更新）；仓库内 `.node-version` 已写 `22`，两处保持一致即可                                                                 |
 
-密钥类变量（若以后接入）勾选 **Encrypt**，保存后不可再查看明文。
+变量值不要加引号、不要带 `v` 前缀。密钥类变量（若以后接入）勾选 **Encrypt**，保存后不可再查看明文。
+
+**改完环境变量必须重新触发一次部署**：Cloudflare 不会把新变量应用到已经排队或正在运行的构建。用 Deployments → 失败的那次 → **Retry deployment**，或在 Settings → Deploy hooks 触发一次。
+
+**自检方式**：看构建日志开头的 `Detected the following tools from environment: ...`。正确结果应类似 `pnpm@10.34.9, npm@10.x.x, nodejs@22.x.x`；若仍是 `pnpm@9.x` / `nodejs@24.x`，说明变量没保存、加错了环境（Preview 与 Production 是两套）、或该项目还停留在旧构建镜像，需要在 Settings → Builds & deployments 里确认。
 
 ### 4.4 首次发布与后续
 
@@ -190,6 +199,41 @@ Production 与 Preview 两套都要加：
 - **回滚**：项目 → Deployments → 选历史部署 → **Rollback**。
 - **自定义域名**：Custom domains → Set up a custom domain；DNS 在 Cloudflare 时可一键 CNAME，外部 DNS 需手动添加 CNAME 指向 `*.pages.dev`。
 - **部署钩子**：Settings → Deploy hooks 可生成 URL 用于手动触发重建。
+
+### 4.5 故障复盘：`ERR_PNPM_NO_LOCKFILE` / `Ignoring not compatible lockfile`
+
+2026-11-21 首次 Cloudflare 构建失败，日志：
+
+```text
+Detected the following tools from environment: pnpm@9.10.0, npm@10.9.2, nodejs@24.22.1
+Installing project dependencies: pnpm install --frozen-lockfile
+(node:182) [DEP0169] DeprecationWarning: url.parse() ...
+WARN  Ignoring not compatible lockfile at /opt/buildhome/repo/pnpm-lock.yaml
+ERR_PNPM_NO_LOCKFILE  Cannot install with "frozen-lockfile" because pnpm-lock.yaml is absent
+Failed: error occurred while installing tools or dependencies
+```
+
+**根因链**（顺序不能弄反）：
+
+1. `pnpm-lock.yaml` 由 pnpm 10.34.9 生成（`lockfileVersion: '9.0'`，含 `catalogs:` 段），但平台环境里是 pnpm 9.10.0，且 4.3 的三个变量一个都没生效。
+2. pnpm 9 判定该 lockfile 与自身不兼容，**直接忽略它**（`Ignoring not compatible lockfile`），于是「看起来 lockfile 不存在」。
+3. `pnpm install --frozen-lockfile` 要求 lockfile 存在且不可改，于是报 `ERR_PNPM_NO_LOCKFILE`。报错里的 `absent` 是误导 —— **文件确实已提交在仓库里**，只是被旧版 pnpm 无视了。
+4. 这一行来自平台**自动依赖安装**阶段，发生在 Build command 之前，所以错误跟你在 Build command 里写什么无关。
+
+**修复**：`PNPM_VERSION=10.34.9` 是必要条件 —— 它让平台自带的自动安装阶段也用 pnpm 10.34.9；再配 `SKIP_DEPENDENCY_INSTALL=1` 去掉重复安装，按 4.3 设置后 Retry deployment。成功时应看到 `Lockfile is up to date, resolution step is skipped`。只设 `SKIP_DEPENDENCY_INSTALL=1` 而不设 `PNPM_VERSION` 修不好，因为 Build command 里的 `pnpm` 仍是 9.x。
+
+**两个不要做的「修复」**：
+
+- 不要改成 `pnpm install --no-frozen-lockfile`：这会让 CI 用 pnpm 9 重新解析并**改写** lockfile，构建变绿，但仓库里的锁文件与线上依赖树脱节，等于把廉价的前置失败换成昂贵的线上事故。
+- 不要删除 `pnpm-lock.yaml` 或降级 `.npmrc`：会丢掉全部锁定的传递依赖版本，同样破坏可复现性。
+
+**兜底方案**（若 `PNPM_VERSION` 在该项目里始终不生效，例如项目仍停留在 v2 构建镜像）：把 Build command 换成自带 pnpm 版本的自包含命令，不再依赖平台 PATH 里的 pnpm：
+
+```bash
+npm i -g pnpm@10.34.9 && pnpm install --frozen-lockfile --prod=false && pnpm --filter @repo/web build
+```
+
+`SKIP_DEPENDENCY_INSTALL=1` 仍必须设置。`--prod=false` 保证 Vite / TypeScript / Turbo 等 devDependencies 被安装。
 
 ---
 
@@ -273,17 +317,19 @@ curl -sI https://ffm-web.pages.dev/assets/index-xxxx.js | grep -i cache-control
 
 ## 10. 常见故障排查
 
-| 现象                                            | 原因                                                  | 修复                                                                        |
-| ----------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------- |
-| 线上空白页 / 404，但构建日志成功                | Root Directory 或 Build output directory 指错         | Vercel/CF 都保持仓库根 + `apps/web/dist`                                    |
-| 深链接硬刷新 404                                | `_redirects` 未进 dist，或 Vercel rewrites 被覆盖     | 确认 `apps/web/public/_redirects` 已提交、产物里有该文件                    |
-| Vercel push 后完全不部署                        | `vercel.json` 残留 `git.deploymentEnabled: false`     | 删除该字段（本轮已删）                                                      |
-| 同一次 push 产生两个部署                        | `.github/workflows/pipeline.yml` 的 deploy job 仍在跑 | 保持 `EXTERNAL_CD_ENABLED` 未设置（默认 false）                             |
-| `pnpm: command not found` / lockfile 版本不兼容 | 平台自带 pnpm 版本与 `packageManager` 不符            | Vercel 设 `ENABLE_EXPERIMENTAL_COREPACK=1`；CF 设 `PNPM_VERSION=10.34.9`    |
-| `Cannot find module 'vite'` / `tsc`             | `NODE_ENV=production` 下 devDependencies 未安装       | Install Command 加 `--prod=false`                                           |
-| `Corepack cannot find matching keyid`           | Corepack 签名密钥过旧                                 | 改用 `npm i -g pnpm@10.34.9 && pnpm install --frozen-lockfile --prod=false` |
-| 构建成功但 JS/CSS 返回 HTML                     | rewrites 抢在静态文件之前                             | 确认 `/(.*)` 是最后一条 rewrite                                             |
-| 改了配置但线上没变化                            | 配置没提交，或只推了 Gitee 没推 GitHub                | `git add` + `commit` + `git publish`                                        |
+| 现象                                                        | 原因                                                   | 修复                                                                               |
+| ----------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| 线上空白页 / 404，但构建日志成功                            | Root Directory 或 Build output directory 指错          | Vercel/CF 都保持仓库根 + `apps/web/dist`                                           |
+| 深链接硬刷新 404                                            | `_redirects` 未进 dist，或 Vercel rewrites 被覆盖      | 确认 `apps/web/public/_redirects` 已提交、产物里有该文件                           |
+| Vercel push 后完全不部署                                    | `vercel.json` 残留 `git.deploymentEnabled: false`      | 删除该字段（本轮已删）                                                             |
+| 同一次 push 产生两个部署                                    | `.github/workflows/pipeline.yml` 的 deploy job 仍在跑  | 保持 `EXTERNAL_CD_ENABLED` 未设置（默认 false）                                    |
+| `Ignoring not compatible lockfile` + `ERR_PNPM_NO_LOCKFILE` | 平台 pnpm 版本低于生成 lockfile 的版本，锁文件被无视   | CF 设 `PNPM_VERSION=10.34.9` + `SKIP_DEPENDENCY_INSTALL=1` 后 Retry，详见 4.5      |
+| `Detected ... pnpm@9.x` / 变量改了没变化                    | 变量没保存、只加了 Production、或没重新触发部署        | 两套环境都加；改完 Retry deployment；检查日志首行                                  |
+| `pnpm: command not found` / `ERR_PNPM_OUTDATED_LOCKFILE`    | 平台 pnpm 版本不符，或 lockfile 与 package.json 不同步 | Vercel 设 `ENABLE_EXPERIMENTAL_COREPACK=1`；本地 `pnpm install` 后一并提交两个文件 |
+| `Cannot find module 'vite'` / `tsc`                         | `NODE_ENV=production` 下 devDependencies 未安装        | Install Command 加 `--prod=false`                                                  |
+| `Corepack cannot find matching keyid`                       | Corepack 签名密钥过旧                                  | 改用 `npm i -g pnpm@10.34.9 && pnpm install --frozen-lockfile --prod=false`        |
+| 构建成功但 JS/CSS 返回 HTML                                 | rewrites 抢在静态文件之前                              | 确认 `/(.*)` 是最后一条 rewrite                                                    |
+| 改了配置但线上没变化                                        | 配置没提交，或只推了 Gitee 没推 GitHub                 | `git add` + `commit` + `git publish`                                               |
 
 ---
 
